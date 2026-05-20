@@ -35,6 +35,7 @@
             min-height: 40px;
             word-wrap: break-word;
             line-height: 1.2;
+            white-space: pre-wrap;
         }
 
         .input-wrapper {
@@ -56,6 +57,11 @@
             background-color: #00FF00;
             animation: blink 0.7s infinite;
             vertical-align: text-bottom;
+        }
+
+        .pager-hint {
+            opacity: 0.5;
+            font-size: 13px;
         }
 
         @keyframes blink {
@@ -90,10 +96,65 @@
         let unrecognizedCount = 0;
         let handlerOverrodeMessage = false;
         const explored = new Set();
+        let sentencePager = null;
+        let pagerAwaitingEnter = false;
+        let twTimer = null;
+        let twFull = '';
+        let twDone = null;
+
+        function startTypewriter(text, onDone) {
+            clearInterval(twTimer);
+            twFull = text;
+            twDone = onDone;
+            messageBox.textContent = '';
+            let i = 0;
+            twTimer = setInterval(() => {
+                messageBox.textContent = text.slice(0, ++i);
+                if (i >= text.length) {
+                    clearInterval(twTimer);
+                    twTimer = null;
+                    const cb = twDone;
+                    twDone = null;
+                    if (cb) cb();
+                }
+            }, 30);
+        }
+
+        function skipTypewriter() {
+            if (!twTimer) return false;
+            clearInterval(twTimer);
+            twTimer = null;
+            messageBox.textContent = twFull;
+            const cb = twDone;
+            twDone = null;
+            if (cb) cb();
+            return true;
+        }
+
+        function showPagerSentence() {
+            const { sentences, index } = sentencePager;
+            inputText.innerHTML = '';
+            startTypewriter(sentences[index], () => {
+                const isLast = index >= sentences.length - 1;
+                if (!isLast) {
+                    inputText.innerHTML = '<span class="pager-hint">[more - press enter to advance]</span>';
+                } else {
+                    sentencePager = null;
+                    if (scenes[currentScene] && scenes[currentScene].autoAdvance) {
+                        pagerAwaitingEnter = true;
+                        inputText.innerHTML = '<span class="pager-hint">[more - press enter to advance]</span>';
+                    } else {
+                        inputText.innerHTML = '<span class="cursor"></span>';
+                        hiddenInput.focus();
+                    }
+                }
+            });
+        }
 
         // Called by a handler to display a custom message and stay on current scene
         function setHint(text) {
             handlerOverrodeMessage = true;
+            skipTypewriter();
             messageBox.textContent = text;
         }
 
@@ -179,21 +240,21 @@
                 denied:         'Type "yes" to proceed.',
                 warning:        'Type "yes" or "I understand".',
                 briefing_1:     'Try: "what happened" or "tell me more".',
-                victims_a:      'Type anything to continue reading.',
-                victims_a2:     'Type anything to continue.',
-                source_b:       'Type anything to continue.',
-                source_b2:      'Type anything to continue.',
-                epa_link:       'Type anything to continue.',
-                holt_a:         'Type anything to continue.',
-                holt_a2:        'Type anything to continue.',
-                land_b:         'Type anything to continue.',
-                land_b2:        'Type anything to continue.',
-                epa_deeper:     'Type anything to continue.',
-                crane_a:        'Type anything to continue.',
-                crane_a2:       'Type anything to continue.',
-                board_b:        'Type anything to continue.',
-                board_b2:       'Type anything to continue.',
-                find_memo_intro:'Type anything to face your decision.',
+                victims_a:      'Press enter to advance through the text.',
+                victims_a2:     'Press enter to advance.',
+                source_b:       'Press enter to advance.',
+                source_b2:      'Press enter to advance.',
+                epa_link:       'Press enter to advance.',
+                holt_a:         'Press enter to advance.',
+                holt_a2:        'Press enter to advance.',
+                land_b:         'Press enter to advance.',
+                land_b2:        'Press enter to advance.',
+                epa_deeper:     'Press enter to advance.',
+                crane_a:        'Press enter to advance.',
+                crane_a2:       'Press enter to advance.',
+                board_b:        'Press enter to advance.',
+                board_b2:       'Press enter to advance.',
+                find_memo_intro:'Press enter to advance.',
                 decision_point: 'Try: "report it" or "expose them" - or - "hide it" or "delete it".',
                 confirm_expose: 'Type "yes" to publish or "no" to reconsider.',
                 confirm_hide:   'Type "yes" to delete or "no" to reconsider.',
@@ -212,9 +273,23 @@
 
             currentScene = sceneKey;
             unrecognizedCount = 0;
+            skipTypewriter();
+            sentencePager = null;
+            pagerAwaitingEnter = false;
             const scene = scenes[sceneKey];
             let message = typeof scene.message === 'function' ? scene.message() : scene.message;
-            messageBox.textContent = message.replace('[name]', playerName);
+            if (Array.isArray(message)) {
+                const sentences = message.map(s => s.replace('[name]', playerName));
+                sentencePager = { sentences, index: 0 };
+                showPagerSentence();
+            } else if (typeof scene.message === 'function' || scene.instant) {
+                messageBox.textContent = message.replace('[name]', playerName);
+                inputText.innerHTML = '<span class="cursor"></span>';
+                hiddenInput.focus();
+            } else {
+                inputText.innerHTML = '<span class="cursor"></span>';
+                startTypewriter(message.replace('[name]', playerName), () => hiddenInput.focus());
+            }
         }
 
         function handleScene(userInput) {
@@ -266,7 +341,12 @@
                 }
             },
             name_entry: {
-                message: 'Welcome, [name]. This terminal contains restricted files. There has been an incident in Millhaven Creek, PA. Do you want to proceed?',
+                message: [
+                    'Welcome, [name].',
+                    'This terminal contains restricted files.',
+                    'There has been an incident in Millhaven Creek, PA.',
+                    'Do you want to proceed?'
+                ],
                 handler: (input) => {
                     const a = analyzeAgreement(input);
                     if (a.mood === 'agrees') return 'warning';
@@ -275,6 +355,7 @@
                 }
             },
             denied: {
+                instant: true,
                 message: 'Access requires your consent. Do you want to proceed?',
                 handler: (input) => {
                     const a = analyzeAgreement(input);
@@ -284,7 +365,11 @@
                 }
             },
             warning: {
-                message: 'WARNING: These files document evidence of a federal crime. Viewing them may implicate you. Do you understand?',
+                message: [
+                    'WARNING: These files document evidence of a federal crime.',
+                    'Viewing them may implicate you.',
+                    'Do you understand?'
+                ],
                 handler: (input) => {
                     const a = analyzeAgreement(input);
                     if (a.mood === 'agrees') return 'briefing_1';
@@ -295,7 +380,12 @@
             // ── PHASE 2: THE INCIDENT ─────────────────────────────────────────────
 
             briefing_1: {
-                message: '1983. Millhaven Creek, Pennsylvania. Population: 4,200. In June, the first cases appear. Children with rashes. Headaches. Tumors. What do you want to know?',
+                message: [
+                    '1983. Millhaven Creek, Pennsylvania. Population: 4,200.',
+                    'In June, the first cases appear.',
+                    'Children with rashes. Headaches. Tumors.',
+                    'What do you want to know?'
+                ],
                 handler: (input) => {
                     if (detectIntent(input, ['why', 'what', 'how', 'children', 'sick', 'happened', 'source', 'cause', 'tell', 'know', 'more', 'who']))
                         return 'hub_1';
@@ -333,32 +423,59 @@
             },
 
             victims_a: {
-                message: 'Forty-seven residents filed complaints with the EPA between June and December 1983. Children developed rashes, severe headaches, and tumor clusters. Dr. Elaine Marsh catalogued 18 pediatric cancer diagnoses by early 1984. The pattern was undeniable. → Continue...',
-                handler: (input) => input ? 'victims_a2' : null
+                autoAdvance: true,
+                message: [
+                    'Forty-seven residents filed complaints with the EPA between June and December 1983.',
+                    'Children developed rashes, severe headaches, and tumor clusters.',
+                    'Dr. Elaine Marsh catalogued 18 pediatric cancer diagnoses by early 1984.',
+                    'The pattern was undeniable.'
+                ],
+                handler: () => 'victims_a2'
             },
             victims_a2: {
-                message: 'Dr. Marsh submitted her findings to the county health board in February 1984. Her report was returned marked "inconclusive." She was told to retest. Funding was never provided. Her career stalled. The children kept getting sick. → Continue...',
-                handler: (input) => {
-                    if (input) { return 'q1_children'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    'Dr. Marsh submitted her findings to the county health board in February 1984.',
+                    'Her report was returned marked "inconclusive."',
+                    'She was told to retest. Funding was never provided.',
+                    'Her career stalled. The children kept getting sick.'
+                ],
+                handler: () => 'q1_children'
             },
 
             source_b: {
-                message: 'The contamination traced back to groundwater movement from Vance Basin - an industrial site half a mile from the school. Chemical seepage had been detectable since 1975. Nobody tested for it until 1983, when a local journalist ordered the first independent analysis. → Continue...',
-                handler: (input) => input ? 'source_b2' : null
+                autoAdvance: true,
+                message: [
+                    'The contamination traced back to groundwater movement from Vance Basin - an industrial site half a mile from the school.',
+                    'Chemical seepage had been detectable since 1975.',
+                    'Nobody tested for it until 1983, when a local journalist ordered the first independent analysis.'
+                ],
+                handler: () => 'source_b2'
             },
             source_b2: {
-                message: 'The results: benzene, chlorinated solvents, dioxins - all far above safe limits. The test cost forty dollars. The EPA had been sitting on 47 complaints for six months. One independent test. Forty dollars. Six months of silence. → Continue...',
-                handler: (input) => {
-                    if (input) { return 'q2_groundwater'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    'The results:',
+                    'Benzene: 2 ppm detected. EPA safe limit: 0.005 ppm. Four hundred times above threshold.',
+                    'Trichloroethylene: 0.21 ppm detected. EPA limit: 0.005 ppm. Forty-two times above safe levels.',
+                    'Dioxins: present at 600 times the federal safety limit.',
+                    'The test cost forty dollars.',
+                    'The EPA had been sitting on 47 complaints for six months.',
+                    'One independent test. Forty dollars. Six months of silence.'
+                ],
+                handler: () => 'q2_groundwater'
             },
 
             epa_link: {
-                message: 'The EPA had a file on Millhaven Creek - 47 complaints, logged and shelved. Someone made sure they stayed there. But that thread leads elsewhere. What matters now: Caldwell Chemical knew long before any of this. There was a man named Raymond Holt. → Continue...',
-                handler: (input) => input ? 'hub_2' : null
+                autoAdvance: true,
+                message: [
+                    'The EPA had a file on Millhaven Creek - 47 complaints, logged and shelved.',
+                    'Someone made sure they stayed there.',
+                    'But that thread leads elsewhere.',
+                    'What matters now: Caldwell Chemical knew long before any of this.',
+                    'There was a man named Raymond Holt.'
+                ],
+                handler: () => 'hub_2'
             },
 
             // ── PHASE 3: HOLT & THE LAND ─────────────────────────────────────────
@@ -393,32 +510,56 @@
             },
 
             holt_a: {
-                message: 'Raymond Holt, 29, junior chemist at Caldwell Chemical. In 1979, routine testing near Vance Basin produced results that alarmed him. He wrote a 14-page internal report documenting benzene levels 400 times the safe limit. Then he submitted it up the chain. → Continue...',
-                handler: (input) => input ? 'holt_a2' : null
+                autoAdvance: true,
+                message: [
+                    'Raymond Holt, 29, junior chemist at Caldwell Chemical.',
+                    'In 1979, routine testing near Vance Basin produced results that alarmed him.',
+                    'Benzene: 2 ppm. The EPA safe limit: 0.005 ppm.',
+                    'Four hundred times the legal threshold. Documented. Dated. Signed.',
+                    'He wrote a 14-page internal report and submitted it up the chain.'
+                ],
+                handler: () => 'holt_a2'
             },
             holt_a2: {
-                message: 'Holt submitted the report to his supervisor, Gerald Tate. Six weeks later, Holt was terminated. Reason: insubordination. Tate kept his job and was promoted the following year. Holt\'s report was reclassified as internal Caldwell property - sealed, inaccessible. Holt spent years trying to recover it. He never did. → Continue...',
-                handler: (input) => {
-                    if (input) { return 'q3_limits'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    'Holt submitted the report to his supervisor, Gerald Tate.',
+                    'Six weeks later, Holt was terminated. Reason: insubordination.',
+                    'Tate kept his job and was promoted the following year.',
+                    "Holt's report was reclassified as internal Caldwell property - sealed, inaccessible.",
+                    'Holt spent years trying to recover it. He never did.'
+                ],
+                handler: () => 'q3_limits'
             },
 
             land_b: {
-                message: 'In 1968, Caldwell Chemical sold the Vance Basin site to the Millhaven School District for one dollar. The deed contained a liability waiver - Caldwell bore no legal responsibility for anything underground. The school district\'s own attorney flagged the low price and the clause. → Continue...',
-                handler: (input) => input ? 'land_b2' : null
+                autoAdvance: true,
+                message: [
+                    'In 1968, Caldwell Chemical sold the Vance Basin site to the Millhaven School District for one dollar.',
+                    'The deed contained a liability waiver - Caldwell bore no legal responsibility for anything underground.',
+                    "The school district's own attorney flagged the low price and the clause."
+                ],
+                handler: () => 'land_b2'
             },
             land_b2: {
-                message: 'The attorney\'s objection was overruled by the superintendent - who had received a personal donation from a Caldwell board member the previous year. Millhaven Elementary opened in 1972. 231 students enrolled. By 1984, 18 of them had been diagnosed with leukemia. → Continue...',
-                handler: (input) => {
-                    if (input) { explored.add('land_done'); return 'hub_2'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    "The attorney's objection was overruled by the superintendent - who had received a personal donation from a Caldwell board member the previous year.",
+                    'Millhaven Elementary opened in 1972. 231 students enrolled.',
+                    'By 1984, 18 of them had been diagnosed with leukemia.'
+                ],
+                handler: () => { explored.add('land_done'); return 'hub_2'; }
             },
 
             epa_deeper: {
-                message: 'Both threads connect. Holt\'s suppressed report. A corrupted land sale. And at the center of both: Director H. Crane. There is more to find - on Crane himself, and on the board that backed him unanimously. → Continue...',
-                handler: (input) => input ? 'hub_3' : null
+                autoAdvance: true,
+                message: [
+                    'Both threads connect.',
+                    "Holt's suppressed report. A corrupted land sale.",
+                    'And at the center of both: Director H. Crane.',
+                    'There is more to find - on Crane himself, and on the board that backed him unanimously.'
+                ],
+                handler: () => 'hub_3'
             },
 
             // ── PHASE 4: THE COVER-UP ────────────────────────────────────────────
@@ -453,37 +594,62 @@
             },
 
             crane_a: {
-                message: 'H. Crane, Director of Operations at Caldwell Chemical, 1963–1971. He personally reviewed Raymond Holt\'s report on March 14, 1968. Three days later, he signed the deed transferring Vance Basin to the school district. The timeline is exact. The choice was deliberate. → Continue...',
-                handler: (input) => input ? 'crane_a2' : null
+                autoAdvance: true,
+                message: [
+                    'H. Crane, Director of Operations at Caldwell Chemical, 1963-1971.',
+                    "He personally reviewed Raymond Holt's report on March 14, 1968.",
+                    'Three days later, he signed the deed transferring Vance Basin to the school district.',
+                    'The timeline is exact. The choice was deliberate.'
+                ],
+                handler: () => 'crane_a2'
             },
             crane_a2: {
-                message: 'Crane retired in 1971 with a full pension and a seat on a real estate trust\'s board. In 1983, when Millhaven began attracting press attention, Crane donated $40,000 to the re-election campaign of Pennsylvania\'s EPA director. The Millhaven investigation that year was quietly deprioritized. → Continue...',
-                handler: (input) => {
-                    if (input) { explored.add('crane_done'); return 'hub_3'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    "Crane retired in 1971 with a full pension and a seat on a real estate trust's board.",
+                    "In 1983, when Millhaven began attracting press attention, Crane donated $40,000 to the re-election campaign of Pennsylvania's EPA director.",
+                    'The Millhaven investigation that year was quietly deprioritized.'
+                ],
+                handler: () => { explored.add('crane_done'); return 'hub_3'; }
             },
 
             board_b: {
-                message: 'Seven board members voted unanimously to approve the Vance Basin sale in March 1968. All seven had received Holt\'s analysis in a packet distributed two weeks before the vote. None raised an objection. None abstained. The meeting lasted four minutes. → Continue...',
-                handler: (input) => input ? 'board_b2' : null
+                autoAdvance: true,
+                message: [
+                    'Seven board members voted unanimously to approve the Vance Basin sale in March 1968.',
+                    "All seven had received Holt's analysis in a packet distributed two weeks before the vote.",
+                    'None raised an objection. None abstained.',
+                    'The meeting lasted four minutes.'
+                ],
+                handler: () => 'board_b2'
             },
             board_b2: {
-                message: 'EXHIBIT 12-C - Internal Memo, March 1968: "Recommend immediate sale of Basin site. Holt\'s analysis creates unacceptable regulatory exposure. Proceed accordingly." - Crane, H. Six of the seven board members received performance bonuses that quarter. The seventh retired early with a consulting contract. → Continue...',
-                handler: (input) => {
-                    if (input) { explored.add('board_done'); return 'hub_3'; }
-                    return null;
-                }
+                autoAdvance: true,
+                message: [
+                    'EXHIBIT 12-C - Internal Memo, March 1968:',
+                    '"Recommend immediate sale of Basin site. Holt\'s analysis creates unacceptable regulatory exposure. Proceed accordingly." - Crane, H.',
+                    'Six of the seven board members received performance bonuses that quarter.',
+                    'The seventh retired early with a consulting contract.'
+                ],
+                handler: () => { explored.add('board_done'); return 'hub_3'; }
             },
 
             // ── PHASE 5: THE DECISION ────────────────────────────────────────────
 
             find_memo_intro: {
-                message: 'You now have all of it. Holt\'s buried report. The $1 land sale. The overruled attorney. Crane\'s signature. The $40,000 donation. The unanimous board vote. Eighteen children\'s medical records. Every name. Every date. → Continue...',
-                handler: (input) => input ? 'q4_superfund' : null
+                autoAdvance: true,
+                message: [
+                    'You now have all of it.',
+                    "Holt's buried report. The $1 land sale.",
+                    "The overruled attorney. Crane's signature.",
+                    'The $40,000 donation. The unanimous board vote.',
+                    "Eighteen children's medical records. Every name. Every date."
+                ],
+                handler: () => 'q4_superfund'
             },
             decision_point: {
-                message: 'The evidence sits in front of you. Every suppressed document. Every deliberate choice. What do you do?\n\n→ REPORT IT - or - HIDE IT',
+                instant: true,
+                message: 'The evidence sits in front of you. Every suppressed document. Every deliberate choice. What do you do?\n\n→ REPORT IT\n→ HIDE IT',
                 handler: (input) => {
                     const exposeKeys = ['report', 'expose', 'publish', 'tell', 'release', 'share', 'send', 'leak', 'reveal', 'public', 'truth', 'go public', 'out', 'news', 'press'];
                     const hideKeys  = ['hide', 'bury', 'delete', 'cover', 'silence', 'destroy', 'burn', 'forget', 'conceal', 'remove', 'purge', 'nothing'];
@@ -493,6 +659,7 @@
                 }
             },
             confirm_expose: {
+                instant: true,
                 message: 'You\'re certain? Once this is public, there is no taking it back.',
                 handler: (input) => {
                     const a = analyzeAgreement(input);
@@ -502,6 +669,7 @@
                 }
             },
             confirm_hide: {
+                instant: true,
                 message: 'You\'re certain? These files will be purged from the system.',
                 handler: (input) => {
                     const a = analyzeAgreement(input);
@@ -514,7 +682,12 @@
             // ── HS-ESS NYSSLS CHECKPOINTS ────────────────────────────────────────
 
             q1_children: {
-                message: '>> HS-ESS3-1 CHECKPOINT <<\n\nEighteen children. Leukemia. Rashes. Tumors — not adults.\n\nQUESTION: Why are children biologically more vulnerable than adults to the effects of chemical contamination in groundwater and soil? Reference developmental biology and exposure pathways in your answer.',
+                message: [
+                    '>> HS-ESS3-1 CHECKPOINT <<',
+                    'Eighteen children. Leukemia. Rashes. Tumors - not adults.',
+                    'QUESTION: Why are children biologically more vulnerable than adults to chemical contamination in groundwater and soil?',
+                    'Reference developmental biology and exposure pathways. Type your answer.'
+                ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
@@ -534,7 +707,7 @@
                     }
                     if (qAttempts.q1 >= 2) {
                         explored.add('victims_done');
-                        setHint('Key concepts: (1) children\'s cells divide rapidly — more DNA replication = more mutation risk; (2) developing organs are more sensitive to toxins; (3) children contact soil/floors directly. Moving on...');
+                        setHint('Key concepts: (1) children\'s cells divide rapidly - more DNA replication = more mutation risk; (2) developing organs are more sensitive to toxins; (3) children contact soil/floors directly. Moving on...');
                         setTimeout(() => transition('hub_1'), 3200);
                         return null;
                     }
@@ -548,7 +721,12 @@
             },
 
             q2_groundwater: {
-                message: '>> HS-ESS2-5 CHECKPOINT <<\n\nChemical seepage from Vance Basin — detectable since 1975. Half a mile away, children are drinking from wells.\n\nQUESTION: Explain how chemical contaminants from an industrial site travel through the Earth\'s systems to reach a community\'s groundwater supply. Reference specific Earth system processes.',
+                message: [
+                    '>> HS-ESS2-5 CHECKPOINT <<',
+                    'Chemical seepage from Vance Basin - detectable since 1975. Half a mile from the school.',
+                    'QUESTION: Explain how chemical contaminants from an industrial site travel through Earth\'s systems to reach a community\'s groundwater supply.',
+                    'Reference specific Earth system processes. Type your answer.'
+                ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
@@ -568,12 +746,12 @@
                     }
                     if (qAttempts.q2 >= 2) {
                         explored.add('source_done');
-                        setHint('Key concepts: precipitation moves water downward through permeable soil layers (percolation/infiltration); chemicals dissolve and travel with this water until reaching the saturated aquifer zone. Moving on...');
+                        setHint('Key concepts: precipitation moves water downward through permeable soil layers (permeability/infiltration); chemicals dissolve and travel with this water until reaching the saturated aquifer zone. Moving on...');
                         setTimeout(() => transition('hub_1'), 3200);
                         return null;
                     }
                     if (score === 1) {
-                        setHint('Partially correct. Also consider: how water moves downward through porous rock and soil (percolation), how chemicals dissolve into that water, and where groundwater collects (aquifer/water table). Try again.');
+                        setHint('Partially correct. Also consider: how water moves downward through porous rock and soil (permeability/infiltration), how chemicals dissolve into that water, and where groundwater collects (aquifer/water table). Try again.');
                     } else {
                         setHint('Think about: (1) rain and surface water seeping downward through soil; (2) whether soil and rock are porous enough to let water pass; (3) where groundwater collects underground. Try again.');
                     }
@@ -582,7 +760,12 @@
             },
 
             q3_limits: {
-                message: '>> HS-ESS3-1 CHECKPOINT <<\n\nBenzene: 400 times the safe limit. One test. Forty dollars.\n\nQUESTION: What does it mean for a chemical to exceed EPA maximum contaminant levels (MCLs)? Explain how regulatory exposure limits are established and why exceeding them creates health risk.',
+                message: [
+                    '>> HS-ESS3-1 CHECKPOINT <<',
+                    'Benzene: 2 ppm detected. Safe limit: 0.005 ppm. One test would cost $40.',
+                    'QUESTION: What does it mean for a chemical to exceed EPA maximum contaminant levels (MCLs)?',
+                    'Explain how exposure limits are established and why exceeding them creates health risk. Type your answer.'
+                ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
@@ -596,7 +779,7 @@
                     qAttempts.q3 = (qAttempts.q3 || 0) + 1;
                     if (score >= 2) {
                         explored.add('holt_done');
-                        setHint('CORRECT. MCLs are set based on dose-response data — the concentration at which a substance creates unacceptable cancer or health risk. Benzene at 400x MCL means risk is orders of magnitude beyond acceptable thresholds. Continuing...');
+                        setHint('CORRECT. MCLs are set based on dose-response data - the concentration at which a substance creates unacceptable cancer or health risk. Benzene at 400x MCL means risk is orders of magnitude beyond acceptable thresholds. Continuing...');
                         setTimeout(() => transition('hub_2'), 2800);
                         return null;
                     }
@@ -616,7 +799,12 @@
             },
 
             q4_superfund: {
-                message: '>> HS-ESS3-4 CHECKPOINT <<\n\nVance Basin. Declared a federal Superfund site. Cleanup: 30 years.\n\nQUESTION: What is a Superfund site, and what does environmental remediation of contaminated soil and groundwater involve? Why does cleanup take so long?',
+                message: [
+                    '>> HS-ESS3-4 CHECKPOINT <<',
+                    'Vance Basin. Declared a federal Superfund site. Cleanup: 30 years.',
+                    'QUESTION: What is a Superfund site, and what does environmental remediation of contaminated soil and groundwater involve?',
+                    'Why does cleanup take so long? Type your answer.'
+                ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
@@ -650,20 +838,41 @@
             // ── ENDINGS ──────────────────────────────────────────────────────────
 
             ending_a: {
-                message: 'The Millhaven files go public. Caldwell Chemical is dissolved. Crane is indicted. Vance Basin is declared a federal Superfund site. Cleanup will take 30 years. The children who grew up there won\'t get those years back. But they will know why.',
+                message: [
+                    'The Millhaven files go public.',
+                    'Caldwell Chemical is dissolved. Crane is indicted.',
+                    'Vance Basin is declared a federal Superfund site.',
+                    'Cleanup will take 30 years.',
+                    "The children who grew up there won't get those years back. But they will know why."
+                ],
                 handler: () => null
             },
             ending_b: {
-                message: 'You close the terminal. The cursor blinks. The files are gone. Somewhere in Millhaven Creek, a child is sick and nobody official knows why. Caldwell Chemical reports record earnings in Q3.',
+                message: [
+                    'You close the terminal.',
+                    'The cursor blinks.',
+                    'The files are gone.',
+                    'Somewhere in Millhaven Creek, a child is sick and nobody official knows why.',
+                    'Caldwell Chemical reports record earnings in Q3.'
+                ],
                 handler: () => null
             },
             ending_neutral: {
-                message: 'You sit with the weight of it. The cursor blinks. Some truths don\'t announce themselves. They wait.',
+                message: [
+                    'You sit with the weight of it.',
+                    'The cursor blinks.',
+                    "Some truths don't announce themselves.",
+                    'They wait.'
+                ],
                 handler: () => null
             }
         };
 
         hiddenInput.addEventListener('input', (e) => {
+            if (sentencePager || pagerAwaitingEnter) {
+                hiddenInput.value = '';
+                return;
+            }
             const text = e.target.value;
             const display = currentScene === 'password' ? '*'.repeat(text.length) : text;
             inputText.innerHTML = display + '<span class="cursor"></span>';
@@ -671,6 +880,22 @@
 
         hiddenInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                const wasPaging = !!sentencePager;
+                if (skipTypewriter() && wasPaging) return; // pager: skip was the only action
+                if (sentencePager) {
+                    hiddenInput.value = '';
+                    sentencePager.index++;
+                    showPagerSentence();
+                    return;
+                }
+                if (pagerAwaitingEnter) {
+                    hiddenInput.value = '';
+                    pagerAwaitingEnter = false;
+                    inputText.innerHTML = '<span class="cursor"></span>';
+                    hiddenInput.focus();
+                    handleScene('.');
+                    return;
+                }
                 const userInput = hiddenInput.value;
                 hiddenInput.value = '';
                 inputText.innerHTML = '<span class="cursor"></span>';
@@ -679,6 +904,7 @@
         });
 
         hiddenInput.focus();
+        document.addEventListener('click', () => hiddenInput.focus());
     </script>
 </body>
 </html>
