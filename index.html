@@ -192,6 +192,40 @@
 
         const qAttempts = {};
 
+        let pwPhase = 0;
+        let pwIntervalId = null;
+
+        const pwPhases = [
+            { accept: 'the correct password', hint: 'Enter the correct password' },
+            { accept: 'harder',               hint: 'the password is harder' },
+            { accept: 'encrypted',            hint: 'the password is encrypted' }
+        ];
+
+        const pwTimeoutMessages = [
+            'In order to log in, please enter the correct password.',
+            'password timeout. the password has changed. the password is harder.',
+            'password timeout. the password has changed. the password is encrypted.'
+        ];
+
+        function advancePwPhase() {
+            if (currentScene !== 'password') { stopPwCycle(); return; }
+            pwPhase = (pwPhase + 1) % 3;
+            qAttempts.pw = 0;
+            messageBox.textContent = pwTimeoutMessages[pwPhase];
+        }
+
+        function startPwCycle() {
+            if (pwIntervalId) return;
+            pwIntervalId = setInterval(advancePwPhase, 120000);
+        }
+
+        function stopPwCycle() {
+            clearInterval(pwIntervalId);
+            pwIntervalId = null;
+            pwPhase = 0;
+            qAttempts.pw = 0;
+        }
+
         function analyzeAgreement(response) {
             const text = response.toLowerCase().trim();
             const agreementWords = ['yes', 'yeah', 'yep', 'yup', 'sure', 'okay', 'ok', 'fine', 'good', 'great',
@@ -338,9 +372,15 @@
             password: {
                 message: 'In order to log in, you must enter the correct password.',
                 handler: (input) => {
-                    if (input.toLowerCase() === 'the correct password') return 'name_entry';
+                    startPwCycle();
+                    const phase = pwPhases[pwPhase];
+                    if (input.toLowerCase() === phase.accept) {
+                        stopPwCycle();
+                        return 'name_entry';
+                    }
                     qAttempts.pw = (qAttempts.pw || 0) + 1;
-                    setHint(qAttempts.pw >= 10 ? 'Enter the correct password!' : 'Enter the correct password.');
+                    const punct = qAttempts.pw >= 10 ? '!' : '.';
+                    setHint(phase.hint + punct);
                     return null;
                 }
             },
