@@ -258,8 +258,11 @@
                 decision_point: 'Try: "report it" or "expose them" - or - "hide it" or "delete it".',
                 confirm_expose: 'Type "yes" to publish or "no" to reconsider.',
                 confirm_hide:   'Type "yes" to delete or "no" to reconsider.',
+                ending_a:       'Type "restart" to begin again.',
+                ending_b:       'Type "restart" to begin again.',
+                ending_neutral: 'Type "restart" to begin again.',
             };
-            return helpTexts[sceneKey] || 'Keep going.';
+            return helpTexts[sceneKey] || 'Type "restart" to begin again.';
         }
 
         function transition(sceneKey) {
@@ -843,28 +846,46 @@
                     'Caldwell Chemical is dissolved. Crane is indicted.',
                     'Vance Basin is declared a federal Superfund site.',
                     'Cleanup will take 30 years.',
-                    "The children who grew up there won't get those years back. But they will know why."
+                    "The children who grew up there won't get those years back. But they will know why.",
+                    '[ Type "restart" to begin again. ]'
                 ],
-                handler: () => null
+                handler: (input) => {
+                    if (/restart|again|replay|new|start/.test(input)) { window.location.reload(); return null; }
+                    setHint('[ Type "restart" to begin again. ]');
+                    return null;
+                }
             },
             ending_b: {
                 message: [
-                    'You close the terminal.',
-                    'The cursor blinks.',
                     'The files are gone.',
-                    'Somewhere in Millhaven Creek, a child is sick and nobody official knows why.',
-                    'Caldwell Chemical reports record earnings in Q3.'
+                    'Every name. Every date. Every suppressed report.',
+                    'A parent in Millhaven Creek is filling out an EPA complaint form right now.',
+                    'It will be logged.',
+                    'It will be shelved.',
+                    'You had all of it.',
+                    'You made the same choice they did.',
+                    'You are now part of the silence.',
+                    '[ Type "restart" to make a different choice. ]'
                 ],
-                handler: () => null
+                handler: (input) => {
+                    if (/restart|again|replay|new|start|different|choice/.test(input)) { window.location.reload(); return null; }
+                    setHint('[ Type "restart" to make a different choice. ]');
+                    return null;
+                }
             },
             ending_neutral: {
                 message: [
                     'You sit with the weight of it.',
                     'The cursor blinks.',
                     "Some truths don't announce themselves.",
-                    'They wait.'
+                    'They wait.',
+                    '[ Type "restart" to begin again. ]'
                 ],
-                handler: () => null
+                handler: (input) => {
+                    if (/restart|again|replay|new|start/.test(input)) { window.location.reload(); return null; }
+                    setHint('[ Type "restart" to begin again. ]');
+                    return null;
+                }
             }
         };
 
