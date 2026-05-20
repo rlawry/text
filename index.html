@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INCIDENT REPORT 7734</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000000;
+            color: #00FF00;
+            font-family: 'Press Start 2P', monospace;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateY(-20%);
+        }
+
+        .container {
+            text-align: left;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .message {
+            font-size: 24px;
+            margin-bottom: 40px;
+            min-height: 40px;
+            word-wrap: break-word;
+            line-height: 1.2;
+        }
+
+        .input-wrapper {
+            font-size: 20px;
+            min-height: 30px;
+        }
+
+        .input-text {
+            word-wrap: break-word;
+            max-width: 500px;
+            line-height: 1.2;
+            display: inline;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 12px;
+            height: 20px;
+            background-color: #00FF00;
+            animation: blink 0.7s infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 49% { background-color: #00FF00; opacity: 1; }
+            50%, 100% { background-color: #00FF00; opacity: 0; }
+        }
+
+        input {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="message" id="messageBox">CLASSIFIED TERMINAL - ACCESS GRANTED. IDENTIFY YOURSELF.</div>
+        <div class="input-wrapper">
+            <div class="input-text" id="inputText"><span class="cursor"></span></div>
+        </div>
+    </div>
+
+    <input type="text" id="hiddenInput" autofocus>
+
+    <script>
+        const messageBox = document.getElementById('messageBox');
+        const inputText = document.getElementById('inputText');
+        const hiddenInput = document.getElementById('hiddenInput');
+
+        let currentScene = 'start';
+        let playerName = '';
+        let unrecognizedCount = 0;
+        let handlerOverrodeMessage = false;
+        const explored = new Set();
+
+        // Called by a handler to display a custom message and stay on current scene
+        function setHint(text) {
+            handlerOverrodeMessage = true;
+            messageBox.textContent = text;
+        }
+
+        function detectIntent(input, keywords) {
+            return keywords.some(kw => input.includes(kw));
+        }
+
+        function levenshtein(a, b) {
+            const m = a.length, n = b.length;
+            const dp = [];
+            for (let i = 0; i <= m; i++) { dp[i] = [i]; for (let j = 1; j <= n; j++) dp[i][j] = 0; }
+            for (let j = 0; j <= n; j++) dp[0][j] = j;
+            for (let i = 1; i <= m; i++)
+                for (let j = 1; j <= n; j++)
+                    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] :
+                        1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+            return dp[m][n];
+        }
+
+        function fuzzyWord(text, kw) {
+            if (text.includes(kw)) return true;
+            if (kw.includes(' ')) return false;
+            const words = text.split(/\W+/);
+            const tol = Math.max(1, Math.floor(kw.length / 5));
+            return words.some(w => w.length >= 3 && kw.length >= 4 && levenshtein(w, kw) <= tol);
+        }
+
+        function fuzzyDetect(text, keywords) {
+            return keywords.some(kw => fuzzyWord(text, kw));
+        }
+
+        function scoreGroups(input, groups) {
+            return groups.filter(g => fuzzyDetect(input, g)).length;
+        }
+
+        const qAttempts = {};
+
+        function analyzeAgreement(response) {
+            const text = response.toLowerCase().trim();
+            const agreementWords = ['yes', 'yeah', 'yep', 'yup', 'sure', 'okay', 'ok', 'fine', 'good', 'great',
+                'love', 'loved', 'like', 'liked', 'enjoyed', 'fun', 'cool', 'awesome', 'amazing', 'nice',
+                'absolutely', 'definitely', 'totally', 'understand', 'i do', 'i will', 'proceed'];
+            const disagreementWords = ['no', 'nope', 'nah', 'never', 'hate', 'hated', 'annoying', 'bad',
+                'terrible', 'awful', 'stupid', 'boring', 'waste', 'pointless', "don't", "won't", "can't"];
+            let agreementScore = 0, disagreementScore = 0;
+            agreementWords.forEach(w => { if (text.includes(w)) agreementScore++; });
+            disagreementWords.forEach(w => { if (text.includes(w)) disagreementScore++; });
+            if (agreementScore > disagreementScore) return { mood: 'agrees' };
+            if (disagreementScore > agreementScore) return { mood: 'disagrees' };
+            return { mood: 'neutral' };
+        }
+
+        function getHelpMessage(sceneKey) {
+            if (sceneKey === 'hub_1') {
+                if (!explored.has('victims_done') && !explored.has('source_done'))
+                    return 'Type "victims" or "source" to choose a thread.';
+                if (explored.has('victims_done'))
+                    return 'One thread remains. Type "source".';
+                return 'One thread remains. Type "victims".';
+            }
+            if (sceneKey === 'hub_2') {
+                if (!explored.has('holt_done') && !explored.has('land_done'))
+                    return 'Type "holt" or "land sale" to choose a lead.';
+                if (explored.has('holt_done'))
+                    return 'One lead remains. Type "land sale".';
+                return 'One lead remains. Type "holt".';
+            }
+            if (sceneKey === 'hub_3') {
+                if (!explored.has('crane_done') && !explored.has('board_done'))
+                    return 'Type "crane" or "board" to choose a path.';
+                if (explored.has('crane_done'))
+                    return 'One path remains. Type "board".';
+                return 'One path remains. Type "crane".';
+            }
+            const helpTexts = {
+                q1_children:    'Answer the question. Think: cell division, organ development, body size, how children contact their environment.',
+                q2_groundwater: 'Answer the question. Think: how water moves through soil, porosity, aquifers, how chemicals dissolve.',
+                q3_limits:      'Answer the question. Think: EPA standards, what ppm/ppb means, why benzene is dangerous, dose and risk.',
+                q4_superfund:   'Answer the question. Think: what Superfund/CERCLA is, cleanup methods, why remediation takes decades.',
+                start:          'Type your name to identify yourself.',
+                password:       'Enter the password to continue.',
+                name_entry:     'Type "yes" to proceed or "no" to decline.',
+                denied:         'Type "yes" to proceed.',
+                warning:        'Type "yes" or "I understand".',
+                briefing_1:     'Try: "what happened" or "tell me more".',
+                victims_a:      'Type anything to continue reading.',
+                victims_a2:     'Type anything to continue.',
+                source_b:       'Type anything to continue.',
+                source_b2:      'Type anything to continue.',
+                epa_link:       'Type anything to continue.',
+                holt_a:         'Type anything to continue.',
+                holt_a2:        'Type anything to continue.',
+                land_b:         'Type anything to continue.',
+                land_b2:        'Type anything to continue.',
+                epa_deeper:     'Type anything to continue.',
+                crane_a:        'Type anything to continue.',
+                crane_a2:       'Type anything to continue.',
+                board_b:        'Type anything to continue.',
+                board_b2:       'Type anything to continue.',
+                find_memo_intro:'Type anything to face your decision.',
+                decision_point: 'Try: "report it" or "expose them" - or - "hide it" or "delete it".',
+                confirm_expose: 'Type "yes" to publish or "no" to reconsider.',
+                confirm_hide:   'Type "yes" to delete or "no" to reconsider.',
+            };
+            return helpTexts[sceneKey] || 'Keep going.';
+        }
+
+        function transition(sceneKey) {
+            // Hub auto-advance when both branches are done
+            if (sceneKey === 'hub_1' && explored.has('victims_done') && explored.has('source_done'))
+                return transition('epa_link');
+            if (sceneKey === 'hub_2' && explored.has('holt_done') && explored.has('land_done'))
+                return transition('epa_deeper');
+            if (sceneKey === 'hub_3' && explored.has('crane_done') && explored.has('board_done'))
+                return transition('find_memo_intro');
+
+            currentScene = sceneKey;
+            unrecognizedCount = 0;
+            const scene = scenes[sceneKey];
+            let message = typeof scene.message === 'function' ? scene.message() : scene.message;
+            messageBox.textContent = message.replace('[name]', playerName);
+        }
+
+        function handleScene(userInput) {
+            const input = userInput.toLowerCase().trim();
+            if (!input) return;
+
+            if (input === 'help') {
+                messageBox.textContent = getHelpMessage(currentScene);
+                return;
+            }
+
+            handlerOverrodeMessage = false;
+            const handler = scenes[currentScene] && scenes[currentScene].handler;
+            if (!handler) return;
+
+            const nextScene = handler(input);
+
+            if (nextScene === null) {
+                if (!handlerOverrodeMessage) {
+                    unrecognizedCount++;
+                    if (currentScene === 'decision_point' && unrecognizedCount >= 3) {
+                        transition('ending_neutral');
+                    } else {
+                        messageBox.textContent = "I don't recognize that input.";
+                    }
+                }
+            } else {
+                transition(nextScene);
+            }
+        }
+
+        const scenes = {
+
+            // ── PHASE 1: CONNECTION ──────────────────────────────────────────────
+
+            start: {
+                message: 'CLASSIFIED TERMINAL - ACCESS GRANTED. IDENTIFY YOURSELF.',
+                handler: (input) => {
+                    if (input) { playerName = input; return 'password'; }
+                    return null;
+                }
+            },
+            password: {
+                message: 'To continue, enter the password. What is the password.',
+                handler: (input) => {
+                    if (input.toLowerCase() === 'what') return 'name_entry';
+                    setHint('What is the password.');
+                    return null;
+                }
+            },
+            name_entry: {
+                message: 'Welcome, [name]. This terminal contains restricted files. There has been an incident in Millhaven Creek, PA. Do you want to proceed?',
+                handler: (input) => {
+                    const a = analyzeAgreement(input);
+                    if (a.mood === 'agrees') return 'warning';
+                    if (a.mood === 'disagrees') return 'denied';
+                    return null;
+                }
+            },
+            denied: {
+                message: 'Access requires your consent. Do you want to proceed?',
+                handler: (input) => {
+                    const a = analyzeAgreement(input);
+                    if (a.mood === 'agrees') return 'warning';
+                    if (a.mood === 'disagrees') return 'denied';
+                    return null;
+                }
+            },
+            warning: {
+                message: 'WARNING: These files document evidence of a federal crime. Viewing them may implicate you. Do you understand?',
+                handler: (input) => {
+                    const a = analyzeAgreement(input);
+                    if (a.mood === 'agrees') return 'briefing_1';
+                    return null;
+                }
+            },
+
+            // ── PHASE 2: THE INCIDENT ─────────────────────────────────────────────
+
+            briefing_1: {
+                message: '1983. Millhaven Creek, Pennsylvania. Population: 4,200. In June, the first cases appear. Children with rashes. Headaches. Tumors. What do you want to know?',
+                handler: (input) => {
+                    if (detectIntent(input, ['why', 'what', 'how', 'children', 'sick', 'happened', 'source', 'cause', 'tell', 'know', 'more', 'who']))
+                        return 'hub_1';
+                    return null;
+                }
+            },
+
+            // HUB 1 - VICTIMS vs SOURCE (both required)
+            hub_1: {
+                message: () => {
+                    const v = explored.has('victims_done');
+                    const s = explored.has('source_done');
+                    if (!v && !s)
+                        return 'Two threads are open. You must examine both before moving on.\n\n→ VICTIMS - who got sick\n→ SOURCE - what caused it';
+                    if (v && !s)
+                        return 'Good. One thread remains.\n\n→ SOURCE - what caused the contamination';
+                    return 'Good. One thread remains.\n\n→ VICTIMS - who was affected';
+                },
+                handler: (input) => {
+                    const victimKeys = ['victim', 'sick', 'children', 'families', 'who got', 'affected', 'ill', 'disease', 'cancer', 'people'];
+                    const sourceKeys = ['source', 'contamination', 'contaminated', 'cause', 'chemical', 'toxic', 'where', 'basin', 'benzene', 'poison'];
+
+                    if (detectIntent(input, victimKeys)) {
+                        if (!explored.has('victims_done')) return 'victims_a';
+                        setHint("You've already examined the victims' story.\n\n→ Ask about the SOURCE.");
+                        return null;
+                    }
+                    if (detectIntent(input, sourceKeys)) {
+                        if (!explored.has('source_done')) return 'source_b';
+                        setHint("You've already examined the contamination source.\n\n→ Ask about the VICTIMS.");
+                        return null;
+                    }
+                    return null;
+                }
+            },
+
+            victims_a: {
+                message: 'Forty-seven residents filed complaints with the EPA between June and December 1983. Children developed rashes, severe headaches, and tumor clusters. Dr. Elaine Marsh catalogued 18 pediatric cancer diagnoses by early 1984. The pattern was undeniable. → Continue...',
+                handler: (input) => input ? 'victims_a2' : null
+            },
+            victims_a2: {
+                message: 'Dr. Marsh submitted her findings to the county health board in February 1984. Her report was returned marked "inconclusive." She was told to retest. Funding was never provided. Her career stalled. The children kept getting sick. → Continue...',
+                handler: (input) => {
+                    if (input) { return 'q1_children'; }
+                    return null;
+                }
+            },
+
+            source_b: {
+                message: 'The contamination traced back to groundwater movement from Vance Basin - an industrial site half a mile from the school. Chemical seepage had been detectable since 1975. Nobody tested for it until 1983, when a local journalist ordered the first independent analysis. → Continue...',
+                handler: (input) => input ? 'source_b2' : null
+            },
+            source_b2: {
+                message: 'The results: benzene, chlorinated solvents, dioxins - all far above safe limits. The test cost forty dollars. The EPA had been sitting on 47 complaints for six months. One independent test. Forty dollars. Six months of silence. → Continue...',
+                handler: (input) => {
+                    if (input) { return 'q2_groundwater'; }
+                    return null;
+                }
+            },
+
+            epa_link: {
+                message: 'The EPA had a file on Millhaven Creek - 47 complaints, logged and shelved. Someone made sure they stayed there. But that thread leads elsewhere. What matters now: Caldwell Chemical knew long before any of this. There was a man named Raymond Holt. → Continue...',
+                handler: (input) => input ? 'hub_2' : null
+            },
+
+            // ── PHASE 3: HOLT & THE LAND ─────────────────────────────────────────
+
+            // HUB 2 - HOLT vs LAND SALE (both required)
+            hub_2: {
+                message: () => {
+                    const h = explored.has('holt_done');
+                    const l = explored.has('land_done');
+                    if (!h && !l)
+                        return 'Two leads. Both must be followed before you can act.\n\n→ HOLT - the chemist who tried to warn them\n→ LAND SALE - how toxic ground became a school playground';
+                    if (h && !l)
+                        return 'One lead remains.\n\n→ LAND SALE - how the contaminated site ended up under a school';
+                    return 'One lead remains.\n\n→ HOLT - the man who tried to stop this';
+                },
+                handler: (input) => {
+                    const holtKeys = ['holt', 'raymond', 'chemist', 'employee', 'worker', 'man who'];
+                    const landKeys = ['land', 'sale', 'sold', 'school', 'deed', 'district', 'playground', 'dollar', 'purchase'];
+
+                    if (detectIntent(input, holtKeys)) {
+                        if (!explored.has('holt_done')) return 'holt_a';
+                        setHint("You've already followed Holt's story.\n\n→ Ask about the LAND SALE.");
+                        return null;
+                    }
+                    if (detectIntent(input, landKeys)) {
+                        if (!explored.has('land_done')) return 'land_b';
+                        setHint("You've already examined the land sale.\n\n→ Ask about HOLT.");
+                        return null;
+                    }
+                    return null;
+                }
+            },
+
+            holt_a: {
+                message: 'Raymond Holt, 29, junior chemist at Caldwell Chemical. In 1979, routine testing near Vance Basin produced results that alarmed him. He wrote a 14-page internal report documenting benzene levels 400 times the safe limit. Then he submitted it up the chain. → Continue...',
+                handler: (input) => input ? 'holt_a2' : null
+            },
+            holt_a2: {
+                message: 'Holt submitted the report to his supervisor, Gerald Tate. Six weeks later, Holt was terminated. Reason: insubordination. Tate kept his job and was promoted the following year. Holt\'s report was reclassified as internal Caldwell property - sealed, inaccessible. Holt spent years trying to recover it. He never did. → Continue...',
+                handler: (input) => {
+                    if (input) { return 'q3_limits'; }
+                    return null;
+                }
+            },
+
+            land_b: {
+                message: 'In 1968, Caldwell Chemical sold the Vance Basin site to the Millhaven School District for one dollar. The deed contained a liability waiver - Caldwell bore no legal responsibility for anything underground. The school district\'s own attorney flagged the low price and the clause. → Continue...',
+                handler: (input) => input ? 'land_b2' : null
+            },
+            land_b2: {
+                message: 'The attorney\'s objection was overruled by the superintendent - who had received a personal donation from a Caldwell board member the previous year. Millhaven Elementary opened in 1972. 231 students enrolled. By 1984, 18 of them had been diagnosed with leukemia. → Continue...',
+                handler: (input) => {
+                    if (input) { explored.add('land_done'); return 'hub_2'; }
+                    return null;
+                }
+            },
+
+            epa_deeper: {
+                message: 'Both threads connect. Holt\'s suppressed report. A corrupted land sale. And at the center of both: Director H. Crane. There is more to find - on Crane himself, and on the board that backed him unanimously. → Continue...',
+                handler: (input) => input ? 'hub_3' : null
+            },
+
+            // ── PHASE 4: THE COVER-UP ────────────────────────────────────────────
+
+            // HUB 3 - CRANE vs THE BOARD (both required)
+            hub_3: {
+                message: () => {
+                    const c = explored.has('crane_done');
+                    const b = explored.has('board_done');
+                    if (!c && !b)
+                        return 'Two more paths. You need both before you can act.\n\n→ CRANE - the director who signed everything\n→ THE BOARD - the seven who voted in silence';
+                    if (c && !b)
+                        return 'One path remains.\n\n→ THE BOARD - the seven who voted unanimously';
+                    return 'One path remains.\n\n→ CRANE - the man at the center of it all';
+                },
+                handler: (input) => {
+                    const craneKeys = ['crane', 'director', 'h crane', 'h.', 'signed'];
+                    const boardKeys = ['board', 'seven', 'vote', 'executives', 'members', 'who else', 'others'];
+
+                    if (detectIntent(input, craneKeys)) {
+                        if (!explored.has('crane_done')) return 'crane_a';
+                        setHint("You've already followed Crane's trail.\n\n→ Ask about THE BOARD.");
+                        return null;
+                    }
+                    if (detectIntent(input, boardKeys)) {
+                        if (!explored.has('board_done')) return 'board_b';
+                        setHint("You've already examined the board.\n\n→ Ask about CRANE.");
+                        return null;
+                    }
+                    return null;
+                }
+            },
+
+            crane_a: {
+                message: 'H. Crane, Director of Operations at Caldwell Chemical, 1963–1971. He personally reviewed Raymond Holt\'s report on March 14, 1968. Three days later, he signed the deed transferring Vance Basin to the school district. The timeline is exact. The choice was deliberate. → Continue...',
+                handler: (input) => input ? 'crane_a2' : null
+            },
+            crane_a2: {
+                message: 'Crane retired in 1971 with a full pension and a seat on a real estate trust\'s board. In 1983, when Millhaven began attracting press attention, Crane donated $40,000 to the re-election campaign of Pennsylvania\'s EPA director. The Millhaven investigation that year was quietly deprioritized. → Continue...',
+                handler: (input) => {
+                    if (input) { explored.add('crane_done'); return 'hub_3'; }
+                    return null;
+                }
+            },
+
+            board_b: {
+                message: 'Seven board members voted unanimously to approve the Vance Basin sale in March 1968. All seven had received Holt\'s analysis in a packet distributed two weeks before the vote. None raised an objection. None abstained. The meeting lasted four minutes. → Continue...',
+                handler: (input) => input ? 'board_b2' : null
+            },
+            board_b2: {
+                message: 'EXHIBIT 12-C - Internal Memo, March 1968: "Recommend immediate sale of Basin site. Holt\'s analysis creates unacceptable regulatory exposure. Proceed accordingly." - Crane, H. Six of the seven board members received performance bonuses that quarter. The seventh retired early with a consulting contract. → Continue...',
+                handler: (input) => {
+                    if (input) { explored.add('board_done'); return 'hub_3'; }
+                    return null;
+                }
+            },
+
+            // ── PHASE 5: THE DECISION ────────────────────────────────────────────
+
+            find_memo_intro: {
+                message: 'You now have all of it. Holt\'s buried report. The $1 land sale. The overruled attorney. Crane\'s signature. The $40,000 donation. The unanimous board vote. Eighteen children\'s medical records. Every name. Every date. → Continue...',
+                handler: (input) => input ? 'q4_superfund' : null
+            },
+            decision_point: {
+                message: 'The evidence sits in front of you. Every suppressed document. Every deliberate choice. What do you do?\n\n→ REPORT IT - or - HIDE IT',
+                handler: (input) => {
+                    const exposeKeys = ['report', 'expose', 'publish', 'tell', 'release', 'share', 'send', 'leak', 'reveal', 'public', 'truth', 'go public', 'out', 'news', 'press'];
+                    const hideKeys  = ['hide', 'bury', 'delete', 'cover', 'silence', 'destroy', 'burn', 'forget', 'conceal', 'remove', 'purge', 'nothing'];
+                    if (detectIntent(input, exposeKeys)) return 'confirm_expose';
+                    if (detectIntent(input, hideKeys))   return 'confirm_hide';
+                    return null;
+                }
+            },
+            confirm_expose: {
+                message: 'You\'re certain? Once this is public, there is no taking it back.',
+                handler: (input) => {
+                    const a = analyzeAgreement(input);
+                    if (a.mood === 'agrees') return 'ending_a';
+                    if (a.mood === 'disagrees') return 'decision_point';
+                    return null;
+                }
+            },
+            confirm_hide: {
+                message: 'You\'re certain? These files will be purged from the system.',
+                handler: (input) => {
+                    const a = analyzeAgreement(input);
+                    if (a.mood === 'agrees') return 'ending_b';
+                    if (a.mood === 'disagrees') return 'decision_point';
+                    return null;
+                }
+            },
+
+            // ── HS-ESS NYSSLS CHECKPOINTS ────────────────────────────────────────
+
+            q1_children: {
+                message: '>> HS-ESS3-1 CHECKPOINT <<\n\nEighteen children. Leukemia. Rashes. Tumors — not adults.\n\nQUESTION: Why are children biologically more vulnerable than adults to the effects of chemical contamination in groundwater and soil? Reference developmental biology and exposure pathways in your answer.',
+                handler: (input) => {
+                    const text = input.toLowerCase();
+                    const groups = [
+                        ['growing', 'growth', 'develop', 'immatur', 'rapid', 'faster', 'divid', 'replicat'],
+                        ['organ', 'immune', 'nervous', 'brain', 'kidney', 'liver', 'lung', 'bone marrow'],
+                        ['hand', 'mouth', 'floor', 'play', 'crawl', 'ingest', 'touch', 'dirt', 'soil'],
+                        ['smaller', 'body weight', 'proportion', 'ratio', 'mass', 'concentrat', 'dose'],
+                        ['dna', 'cell', 'mutati', 'chromosom', 'cancer', 'leukemia', 'gene', 'genetic']
+                    ];
+                    const score = scoreGroups(text, groups);
+                    qAttempts.q1 = (qAttempts.q1 || 0) + 1;
+                    if (score >= 2) {
+                        explored.add('victims_done');
+                        setHint('CORRECT. Rapidly dividing cells, immature organ systems, behavioral exposure (hand-to-mouth, ground contact), and lower body mass all increase vulnerability. Continuing...');
+                        setTimeout(() => transition('hub_1'), 2800);
+                        return null;
+                    }
+                    if (qAttempts.q1 >= 2) {
+                        explored.add('victims_done');
+                        setHint('Key concepts: (1) children\'s cells divide rapidly — more DNA replication = more mutation risk; (2) developing organs are more sensitive to toxins; (3) children contact soil/floors directly. Moving on...');
+                        setTimeout(() => transition('hub_1'), 3200);
+                        return null;
+                    }
+                    if (score === 1) {
+                        setHint('Partially correct. Also consider: rapidly dividing cells increase mutation risk; developing organs are more sensitive; hand-to-mouth behavior creates direct ingestion pathways. Try again.');
+                    } else {
+                        setHint('Think about: (1) how fast children\'s cells divide vs adults; (2) how immature their organ systems are; (3) how children physically interact with contaminated soil. Try again.');
+                    }
+                    return null;
+                }
+            },
+
+            q2_groundwater: {
+                message: '>> HS-ESS2-5 CHECKPOINT <<\n\nChemical seepage from Vance Basin — detectable since 1975. Half a mile away, children are drinking from wells.\n\nQUESTION: Explain how chemical contaminants from an industrial site travel through the Earth\'s systems to reach a community\'s groundwater supply. Reference specific Earth system processes.',
+                handler: (input) => {
+                    const text = input.toLowerCase();
+                    const groups = [
+                        ['seep', 'percolat', 'infiltrat', 'leach', 'flow', 'drain', 'absorb', 'sink', 'move', 'travel'],
+                        ['soil', 'rock', 'porous', 'permeabl', 'sediment', 'subsurfac', 'underground', 'layer', 'gravel', 'sand'],
+                        ['aquifer', 'water table', 'groundwater', 'saturat', 'well', 'zone'],
+                        ['dissolv', 'solubl', 'mix', 'spread', 'plume', 'migrat', 'transport'],
+                        ['industri', 'waste', 'dump', 'basin', 'site', 'stored', 'buried', 'tank', 'runoff', 'rain', 'precipit']
+                    ];
+                    const score = scoreGroups(text, groups);
+                    qAttempts.q2 = (qAttempts.q2 || 0) + 1;
+                    if (score >= 2) {
+                        explored.add('source_done');
+                        setHint('CORRECT. Contaminants dissolve in water and percolate through porous soil and rock layers, reaching the saturated zone (aquifer) and spreading via groundwater flow. Continuing...');
+                        setTimeout(() => transition('hub_1'), 2800);
+                        return null;
+                    }
+                    if (qAttempts.q2 >= 2) {
+                        explored.add('source_done');
+                        setHint('Key concepts: precipitation moves water downward through permeable soil layers (percolation/infiltration); chemicals dissolve and travel with this water until reaching the saturated aquifer zone. Moving on...');
+                        setTimeout(() => transition('hub_1'), 3200);
+                        return null;
+                    }
+                    if (score === 1) {
+                        setHint('Partially correct. Also consider: how water moves downward through porous rock and soil (percolation), how chemicals dissolve into that water, and where groundwater collects (aquifer/water table). Try again.');
+                    } else {
+                        setHint('Think about: (1) rain and surface water seeping downward through soil; (2) whether soil and rock are porous enough to let water pass; (3) where groundwater collects underground. Try again.');
+                    }
+                    return null;
+                }
+            },
+
+            q3_limits: {
+                message: '>> HS-ESS3-1 CHECKPOINT <<\n\nBenzene: 400 times the safe limit. One test. Forty dollars.\n\nQUESTION: What does it mean for a chemical to exceed EPA maximum contaminant levels (MCLs)? Explain how regulatory exposure limits are established and why exceeding them creates health risk.',
+                handler: (input) => {
+                    const text = input.toLowerCase();
+                    const groups = [
+                        ['standard', 'limit', 'threshold', 'maximum', 'regulat', 'safe level', 'allow', 'legal', 'mcl'],
+                        ['ppm', 'ppb', 'concentrat', 'level', 'amount', 'parts per', 'measur'],
+                        ['cancer', 'carcinogen', 'toxic', 'harm', 'disease', 'leukemia', 'benzene', 'health risk', 'danger'],
+                        ['epa', 'government', 'federal', 'agency', 'law', 'policy', 'enforc'],
+                        ['dose', 'exposure', 'chronic', 'long term', 'accumul', 'risk', 'probabil', 'bioaccumul']
+                    ];
+                    const score = scoreGroups(text, groups);
+                    qAttempts.q3 = (qAttempts.q3 || 0) + 1;
+                    if (score >= 2) {
+                        explored.add('holt_done');
+                        setHint('CORRECT. MCLs are set based on dose-response data — the concentration at which a substance creates unacceptable cancer or health risk. Benzene at 400x MCL means risk is orders of magnitude beyond acceptable thresholds. Continuing...');
+                        setTimeout(() => transition('hub_2'), 2800);
+                        return null;
+                    }
+                    if (qAttempts.q3 >= 2) {
+                        explored.add('holt_done');
+                        setHint('Key concepts: MCLs define legal maximum concentrations (usually in ppb/ppm); they are based on dose-response studies showing at what exposure level a chemical causes cancer or organ damage. Moving on...');
+                        setTimeout(() => transition('hub_2'), 3200);
+                        return null;
+                    }
+                    if (score === 1) {
+                        setHint('Partially correct. Also consider: how MCLs are measured (parts per billion/million), what dose-response relationships tell us about chronic exposure, and who sets and enforces these standards. Try again.');
+                    } else {
+                        setHint('Think about: (1) what unit we use to measure chemical concentration in water; (2) how scientists determine how much of a chemical is dangerous; (3) what agency sets these limits and why. Try again.');
+                    }
+                    return null;
+                }
+            },
+
+            q4_superfund: {
+                message: '>> HS-ESS3-4 CHECKPOINT <<\n\nVance Basin. Declared a federal Superfund site. Cleanup: 30 years.\n\nQUESTION: What is a Superfund site, and what does environmental remediation of contaminated soil and groundwater involve? Why does cleanup take so long?',
+                handler: (input) => {
+                    const text = input.toLowerCase();
+                    const groups = [
+                        ['superfund', 'cercla', 'federal', 'national priority', 'epa', 'designat', 'npl'],
+                        ['cleanup', 'remediat', 'excavat', 'remov', 'treat', 'pump', 'extract', 'bioremediat', 'cap', 'contain'],
+                        ['years', 'decade', 'long time', 'slow', '30', 'thirty', 'generat', 'prolonged', 'time'],
+                        ['soil', 'groundwater', 'sediment', 'contaminat', 'toxic', 'chemical', 'pollut', 'benzene', 'spread'],
+                        ['respons', 'liabl', 'pay', 'polluter', 'company', 'fund', 'cost', 'expensiv', 'billion']
+                    ];
+                    const score = scoreGroups(text, groups);
+                    qAttempts.q4 = (qAttempts.q4 || 0) + 1;
+                    if (score >= 2) {
+                        setHint('CORRECT. Superfund (CERCLA) sites require federally-funded remediation: excavating contaminated soil, pump-and-treat groundwater systems, or bioremediation. Decades are required because contaminants spread through aquifers and chemical breakdown is slow. Continuing...');
+                        setTimeout(() => transition('decision_point'), 2800);
+                        return null;
+                    }
+                    if (qAttempts.q4 >= 2) {
+                        setHint('Key concepts: Superfund/CERCLA = federal law designating worst contaminated sites for EPA-led cleanup; methods include soil excavation, pump-and-treat, bioremediation; slow because contaminants disperse through aquifer rock over large areas. Moving on...');
+                        setTimeout(() => transition('decision_point'), 3200);
+                        return null;
+                    }
+                    if (score === 1) {
+                        setHint('Partially correct. Also consider: specific cleanup methods (pump-and-treat, excavation, bioremediation), the scale of groundwater contamination, and why chemical breakdown in saturated soil is so slow. Try again.');
+                    } else {
+                        setHint('Think about: (1) what federal law governs toxic waste cleanup; (2) how you physically remove chemicals from groundwater; (3) why contamination that spreads through rock and soil takes decades to reverse. Try again.');
+                    }
+                    return null;
+                }
+            },
+
+            // ── ENDINGS ──────────────────────────────────────────────────────────
+
+            ending_a: {
+                message: 'The Millhaven files go public. Caldwell Chemical is dissolved. Crane is indicted. Vance Basin is declared a federal Superfund site. Cleanup will take 30 years. The children who grew up there won\'t get those years back. But they will know why.',
+                handler: () => null
+            },
+            ending_b: {
+                message: 'You close the terminal. The cursor blinks. The files are gone. Somewhere in Millhaven Creek, a child is sick and nobody official knows why. Caldwell Chemical reports record earnings in Q3.',
+                handler: () => null
+            },
+            ending_neutral: {
+                message: 'You sit with the weight of it. The cursor blinks. Some truths don\'t announce themselves. They wait.',
+                handler: () => null
+            }
+        };
+
+        hiddenInput.addEventListener('input', (e) => {
+            const text = e.target.value;
+            const display = currentScene === 'password' ? '*'.repeat(text.length) : text;
+            inputText.innerHTML = display + '<span class="cursor"></span>';
+        });
+
+        hiddenInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const userInput = hiddenInput.value;
+                hiddenInput.value = '';
+                inputText.innerHTML = '<span class="cursor"></span>';
+                handleScene(userInput);
+            }
+        });
+
+        hiddenInput.focus();
+    </script>
+</body>
+</html>
