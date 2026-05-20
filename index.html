@@ -232,7 +232,7 @@
             const helpTexts = {
                 q1_children:    'Answer the question. Think: cell division, organ development, body size, how children contact their environment.',
                 q2_groundwater: 'Answer the question. Think: how water moves through soil, porosity, aquifers, how chemicals dissolve.',
-                q3_limits:      'Answer the question. Think: EPA standards, what ppm/ppb means, why benzene is dangerous, dose and risk.',
+                q3_limits:      'Answer the question. Think: how MCLs are set using dose-response data, what ppm means, who sets these limits, and what 400x the threshold means for real risk.',
                 q4_superfund:   'Answer the question. Think: what Superfund/CERCLA is, cleanup methods, why remediation takes decades.',
                 start:          'Type your name to identify yourself.',
                 password:       'Enter the password to continue.',
@@ -684,37 +684,37 @@
             q1_children: {
                 message: [
                     '>> HS-ESS3-1 CHECKPOINT <<',
-                    'Eighteen children. Leukemia. Rashes. Tumors - not adults.',
-                    'QUESTION: Why are children biologically more vulnerable than adults to chemical contamination in groundwater and soil?',
-                    'Reference developmental biology and exposure pathways. Type your answer.'
+                    'Same water. Same soil. Eighteen children sick - adults largely spared.',
+                    'QUESTION: The contamination of Millhaven\'s groundwater is an environmental hazard with unequal effects across the community. Using evidence from this case, explain why children experienced more severe health impacts than adults.',
+                    'What properties of this hazard, and what biological and behavioral factors, determined who was most affected? Type your answer.'
                 ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
                         ['growing', 'growth', 'develop', 'immatur', 'rapid', 'faster', 'divid', 'replicat'],
                         ['organ', 'immune', 'nervous', 'brain', 'kidney', 'liver', 'lung', 'bone marrow'],
-                        ['hand', 'mouth', 'floor', 'play', 'crawl', 'ingest', 'touch', 'dirt', 'soil'],
-                        ['smaller', 'body weight', 'proportion', 'ratio', 'mass', 'concentrat', 'dose'],
-                        ['dna', 'cell', 'mutati', 'chromosom', 'cancer', 'leukemia', 'gene', 'genetic']
+                        ['hand', 'mouth', 'floor', 'play', 'crawl', 'ingest', 'touch', 'dirt', 'soil', 'contact'],
+                        ['smaller', 'body weight', 'proportion', 'ratio', 'mass', 'concentrat', 'dose', 'size'],
+                        ['dna', 'cell', 'mutati', 'chromosom', 'cancer', 'leukemia', 'gene', 'genetic', 'vulner']
                     ];
                     const score = scoreGroups(text, groups);
                     qAttempts.q1 = (qAttempts.q1 || 0) + 1;
                     if (score >= 2) {
                         explored.add('victims_done');
-                        setHint('CORRECT. Rapidly dividing cells, immature organ systems, behavioral exposure (hand-to-mouth, ground contact), and lower body mass all increase vulnerability. Continuing...');
-                        setTimeout(() => transition('hub_1'), 2800);
+                        setHint('CORRECT. Children\'s rapidly dividing cells and developing organ systems are more sensitive to toxic damage. Smaller body mass means a higher dose per kilogram. Direct contact with soil and hand-to-mouth behavior increases ingestion. The same hazard hits harder at certain life stages. Continuing...');
+                        setTimeout(() => transition('hub_1'), 3200);
                         return null;
                     }
                     if (qAttempts.q1 >= 2) {
                         explored.add('victims_done');
-                        setHint('Key concepts: (1) children\'s cells divide rapidly - more DNA replication = more mutation risk; (2) developing organs are more sensitive to toxins; (3) children contact soil/floors directly. Moving on...');
-                        setTimeout(() => transition('hub_1'), 3200);
+                        setHint('Key concepts: (1) rapidly dividing cells = more chances for toxic damage to DNA; (2) developing organs - brain, immune system, kidneys - are far more sensitive to disruption; (3) children play on floors and ground, increasing direct contact with contaminated soil. Moving on...');
+                        setTimeout(() => transition('hub_1'), 3500);
                         return null;
                     }
                     if (score === 1) {
-                        setHint('Partially correct. Also consider: rapidly dividing cells increase mutation risk; developing organs are more sensitive; hand-to-mouth behavior creates direct ingestion pathways. Try again.');
+                        setHint('Partially correct. This hazard affected the community unevenly - think about what made certain bodies more vulnerable: rate of cell growth, maturity of organ systems, and how much physical contact children have with contaminated surfaces. Try again.');
                     } else {
-                        setHint('Think about: (1) how fast children\'s cells divide vs adults; (2) how immature their organ systems are; (3) how children physically interact with contaminated soil. Try again.');
+                        setHint('Think about: (1) how fast children\'s cells are dividing compared to adults; (2) how finished - or unfinished - their organ systems are; (3) how children spend time close to the ground and soil. Try again.');
                     }
                     return null;
                 }
@@ -723,14 +723,14 @@
             q2_groundwater: {
                 message: [
                     '>> HS-ESS2-5 CHECKPOINT <<',
-                    'Chemical seepage from Vance Basin - detectable since 1975. Half a mile from the school.',
-                    'QUESTION: Explain how chemical contaminants from an industrial site travel through Earth\'s systems to reach a community\'s groundwater supply.',
-                    'Reference specific Earth system processes. Type your answer.'
+                    'Vance Basin. Half a mile from Millhaven\'s school. Contamination detectable since 1975 - eight years before anyone tested the water.',
+                    'QUESTION: Trace the path. How did chemical waste stored at Vance Basin travel through Earth\'s systems to reach the groundwater beneath Millhaven\'s homes?',
+                    'Explain the properties of water, soil, and rock that made this movement possible. Type your answer.'
                 ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
-                        ['seep', 'percolat', 'infiltrat', 'leach', 'flow', 'drain', 'absorb', 'sink', 'move', 'travel'],
+                        ['seep', 'percolat', 'infiltrat', 'leach', 'flow', 'drain', 'absorb', 'sink', 'move', 'travel', 'downward'],
                         ['soil', 'rock', 'porous', 'permeabl', 'sediment', 'subsurfac', 'underground', 'layer', 'gravel', 'sand'],
                         ['aquifer', 'water table', 'groundwater', 'saturat', 'well', 'zone'],
                         ['dissolv', 'solubl', 'mix', 'spread', 'plume', 'migrat', 'transport'],
@@ -740,20 +740,20 @@
                     qAttempts.q2 = (qAttempts.q2 || 0) + 1;
                     if (score >= 2) {
                         explored.add('source_done');
-                        setHint('CORRECT. Contaminants dissolve in water and percolate through porous soil and rock layers, reaching the saturated zone (aquifer) and spreading via groundwater flow. Continuing...');
-                        setTimeout(() => transition('hub_1'), 2800);
+                        setHint('CORRECT. Precipitation carries dissolved contaminants downward through permeable soil and rock by infiltration. As water percolates through porous layers, it reaches the saturated zone - the aquifer - where it spreads through the groundwater system. The properties of the material (porosity, permeability) and of water (solubility, gravity-driven flow) determine how far and how fast. Continuing...');
+                        setTimeout(() => transition('hub_1'), 3500);
                         return null;
                     }
                     if (qAttempts.q2 >= 2) {
                         explored.add('source_done');
-                        setHint('Key concepts: precipitation moves water downward through permeable soil layers (permeability/infiltration); chemicals dissolve and travel with this water until reaching the saturated aquifer zone. Moving on...');
-                        setTimeout(() => transition('hub_1'), 3200);
+                        setHint('Key concepts: water infiltrates downward through permeable (porous) soil and rock; chemicals dissolve into that water and travel with it; the saturated zone below the water table is the aquifer - once contaminated there, the plume spreads with groundwater flow. Moving on...');
+                        setTimeout(() => transition('hub_1'), 3500);
                         return null;
                     }
                     if (score === 1) {
-                        setHint('Partially correct. Also consider: how water moves downward through porous rock and soil (permeability/infiltration), how chemicals dissolve into that water, and where groundwater collects (aquifer/water table). Try again.');
+                        setHint('Partially correct. Focus on the full path: how water enters the ground (infiltration), what properties of soil and rock allow it to pass through (porosity/permeability), how chemicals dissolve and travel with it, and where it ends up (aquifer/water table). Try again.');
                     } else {
-                        setHint('Think about: (1) rain and surface water seeping downward through soil; (2) whether soil and rock are porous enough to let water pass; (3) where groundwater collects underground. Try again.');
+                        setHint('Think about: (1) what happens to rainwater that falls near a contaminated site; (2) what makes some soil and rock passable by water; (3) where underground water collects and how it moves. Try again.');
                     }
                     return null;
                 }
@@ -761,38 +761,38 @@
 
             q3_limits: {
                 message: [
-                    '>> HS-ESS3-1 CHECKPOINT <<',
-                    'Benzene: 2 ppm detected. Safe limit: 0.005 ppm. One test would cost $40.',
-                    'QUESTION: What does it mean for a chemical to exceed EPA maximum contaminant levels (MCLs)?',
-                    'Explain how exposure limits are established and why exceeding them creates health risk. Type your answer.'
+                    '>> HS-ESS3-4 CHECKPOINT <<',
+                    'Benzene: 2 ppm. EPA limit: 0.005 ppm. Four hundred times the legal threshold. One $40 test revealed it.',
+                    'QUESTION: EPA maximum contaminant levels (MCLs) are a regulatory tool designed to protect human health from chemical contamination of Earth\'s water systems. Evaluate how this standard works.',
+                    'How are MCLs established, and what does it mean - scientifically and for public health - that Millhaven\'s benzene level exceeded the limit by 400 times? Type your answer.'
                 ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
-                        ['standard', 'limit', 'threshold', 'maximum', 'regulat', 'safe level', 'allow', 'legal', 'mcl'],
-                        ['ppm', 'ppb', 'concentrat', 'level', 'amount', 'parts per', 'measur'],
+                        ['standard', 'limit', 'threshold', 'maximum', 'regulat', 'safe level', 'allow', 'legal', 'mcl', 'protect'],
+                        ['ppm', 'ppb', 'concentrat', 'level', 'amount', 'parts per', 'measur', 'unit'],
                         ['cancer', 'carcinogen', 'toxic', 'harm', 'disease', 'leukemia', 'benzene', 'health risk', 'danger'],
-                        ['epa', 'government', 'federal', 'agency', 'law', 'policy', 'enforc'],
-                        ['dose', 'exposure', 'chronic', 'long term', 'accumul', 'risk', 'probabil', 'bioaccumul']
+                        ['epa', 'government', 'federal', 'agency', 'law', 'policy', 'enforc', 'regulat'],
+                        ['dose', 'exposure', 'chronic', 'long term', 'accumul', 'risk', 'probabil', 'response', 'study', 'research']
                     ];
                     const score = scoreGroups(text, groups);
                     qAttempts.q3 = (qAttempts.q3 || 0) + 1;
                     if (score >= 2) {
                         explored.add('holt_done');
-                        setHint('CORRECT. MCLs are set based on dose-response data - the concentration at which a substance creates unacceptable cancer or health risk. Benzene at 400x MCL means risk is orders of magnitude beyond acceptable thresholds. Continuing...');
-                        setTimeout(() => transition('hub_2'), 2800);
+                        setHint('CORRECT. MCLs are set using dose-response research - scientists determine the concentration at which chronic exposure to a chemical creates unacceptable cancer or organ damage risk. The EPA then sets the legal limit below that threshold. Benzene at 400x the MCL means the community was exposed to risk levels orders of magnitude beyond what the standard was built to prevent. Continuing...');
+                        setTimeout(() => transition('hub_2'), 3500);
                         return null;
                     }
                     if (qAttempts.q3 >= 2) {
                         explored.add('holt_done');
-                        setHint('Key concepts: MCLs define legal maximum concentrations (usually in ppb/ppm); they are based on dose-response studies showing at what exposure level a chemical causes cancer or organ damage. Moving on...');
-                        setTimeout(() => transition('hub_2'), 3200);
+                        setHint('Key concepts: MCLs are legal maximum concentrations (measured in ppm/ppb) based on dose-response studies - at what exposure level does a chemical cause cancer or organ damage? The EPA sets limits below that threshold. Benzene at 400x the MCL means the protective standard had completely failed to function. Moving on...');
+                        setTimeout(() => transition('hub_2'), 3500);
                         return null;
                     }
                     if (score === 1) {
-                        setHint('Partially correct. Also consider: how MCLs are measured (parts per billion/million), what dose-response relationships tell us about chronic exposure, and who sets and enforces these standards. Try again.');
+                        setHint('Partially correct. Evaluate the standard as a system: how scientists measure concentration (ppm), how they determine what dose causes harm (dose-response studies), and what it means when a regulatory tool fails to protect - as it did here. Try again.');
                     } else {
-                        setHint('Think about: (1) what unit we use to measure chemical concentration in water; (2) how scientists determine how much of a chemical is dangerous; (3) what agency sets these limits and why. Try again.');
+                        setHint('Think about: (1) how we measure how much of a chemical is in water; (2) how scientists figure out at what amount a chemical becomes dangerous; (3) what the EPA\'s role is in turning that science into a legal limit. Try again.');
                     }
                     return null;
                 }
@@ -801,35 +801,35 @@
             q4_superfund: {
                 message: [
                     '>> HS-ESS3-4 CHECKPOINT <<',
-                    'Vance Basin. Declared a federal Superfund site. Cleanup: 30 years.',
-                    'QUESTION: What is a Superfund site, and what does environmental remediation of contaminated soil and groundwater involve?',
-                    'Why does cleanup take so long? Type your answer.'
+                    'Vance Basin. Declared a federal Superfund site in 1985. Projected cleanup: 30 years.',
+                    'QUESTION: Superfund remediation is a technological response to human damage to Earth\'s systems. Evaluate what this solution involves and why it requires decades to complete.',
+                    'What methods are used to remove or neutralize contamination from soil and groundwater, and what makes the problem so difficult to reverse? Type your answer.'
                 ],
                 handler: (input) => {
                     const text = input.toLowerCase();
                     const groups = [
-                        ['superfund', 'cercla', 'federal', 'national priority', 'epa', 'designat', 'npl'],
-                        ['cleanup', 'remediat', 'excavat', 'remov', 'treat', 'pump', 'extract', 'bioremediat', 'cap', 'contain'],
-                        ['years', 'decade', 'long time', 'slow', '30', 'thirty', 'generat', 'prolonged', 'time'],
-                        ['soil', 'groundwater', 'sediment', 'contaminat', 'toxic', 'chemical', 'pollut', 'benzene', 'spread'],
-                        ['respons', 'liabl', 'pay', 'polluter', 'company', 'fund', 'cost', 'expensiv', 'billion']
+                        ['superfund', 'cercla', 'federal', 'national priority', 'epa', 'designat', 'npl', 'law'],
+                        ['cleanup', 'remediat', 'excavat', 'remov', 'treat', 'pump', 'extract', 'bioremediat', 'cap', 'contain', 'neutraliz'],
+                        ['years', 'decade', 'long time', 'slow', '30', 'thirty', 'generat', 'prolonged', 'time', 'difficult'],
+                        ['soil', 'groundwater', 'sediment', 'contaminat', 'toxic', 'chemical', 'pollut', 'benzene', 'spread', 'aquifer'],
+                        ['respons', 'liabl', 'pay', 'polluter', 'company', 'fund', 'cost', 'expensiv', 'billion', 'accountab']
                     ];
                     const score = scoreGroups(text, groups);
                     qAttempts.q4 = (qAttempts.q4 || 0) + 1;
                     if (score >= 2) {
-                        setHint('CORRECT. Superfund (CERCLA) sites require federally-funded remediation: excavating contaminated soil, pump-and-treat groundwater systems, or bioremediation. Decades are required because contaminants spread through aquifers and chemical breakdown is slow. Continuing...');
-                        setTimeout(() => transition('decision_point'), 2800);
+                        setHint('CORRECT. Under CERCLA (Superfund), the EPA identifies the worst contaminated sites and leads federally-funded remediation. Methods include excavating contaminated soil, pump-and-treat systems for groundwater, and bioremediation using microbes. Cleanup takes decades because contaminants disperse through aquifer rock across wide areas, and the slow natural chemistry of breakdown cannot be significantly accelerated. Continuing...');
+                        setTimeout(() => transition('decision_point'), 3500);
                         return null;
                     }
                     if (qAttempts.q4 >= 2) {
-                        setHint('Key concepts: Superfund/CERCLA = federal law designating worst contaminated sites for EPA-led cleanup; methods include soil excavation, pump-and-treat, bioremediation; slow because contaminants disperse through aquifer rock over large areas. Moving on...');
-                        setTimeout(() => transition('decision_point'), 3200);
+                        setHint('Key concepts: Superfund/CERCLA = the federal law that designates the nation\'s most contaminated sites for EPA-led cleanup; methods include soil excavation, pump-and-treat groundwater systems, bioremediation; slow because chemicals spread through porous rock in aquifers over large areas and break down very slowly. Moving on...');
+                        setTimeout(() => transition('decision_point'), 3500);
                         return null;
                     }
                     if (score === 1) {
-                        setHint('Partially correct. Also consider: specific cleanup methods (pump-and-treat, excavation, bioremediation), the scale of groundwater contamination, and why chemical breakdown in saturated soil is so slow. Try again.');
+                        setHint('Partially correct. Evaluate the solution more fully: what specific methods exist to remove chemicals from soil and water, what law authorized this response, and why the physical and chemical properties of contaminated aquifers make reversal so slow. Try again.');
                     } else {
-                        setHint('Think about: (1) what federal law governs toxic waste cleanup; (2) how you physically remove chemicals from groundwater; (3) why contamination that spreads through rock and soil takes decades to reverse. Try again.');
+                        setHint('Think about: (1) what federal law created the Superfund program and who it holds accountable; (2) how engineers physically remove or treat chemicals in soil and groundwater; (3) why chemicals that have spread through rock and aquifer take so long to clean up. Try again.');
                     }
                     return null;
                 }
