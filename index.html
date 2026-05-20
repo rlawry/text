@@ -339,7 +339,8 @@
                 message: 'To continue, enter the password. What is the password.',
                 handler: (input) => {
                     if (input.toLowerCase() === 'what') return 'name_entry';
-                    setHint('What is the password.');
+                    qAttempts.pw = (qAttempts.pw || 0) + 1;
+                    setHint(qAttempts.pw >= 10 ? 'What is the password!' : 'What is the password.');
                     return null;
                 }
             },
