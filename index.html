@@ -336,11 +336,11 @@
                 }
             },
             password: {
-                message: 'To continue, enter the password. What is the password.',
+                message: 'In order to log in, you must enter the correct password.',
                 handler: (input) => {
-                    if (input.toLowerCase() === 'what') return 'name_entry';
+                    if (input.toLowerCase() === 'the correct password') return 'name_entry';
                     qAttempts.pw = (qAttempts.pw || 0) + 1;
-                    setHint(qAttempts.pw >= 10 ? 'What is the password!' : 'What is the password.');
+                    setHint(qAttempts.pw >= 10 ? 'Enter the correct password!' : 'Enter the correct password.');
                     return null;
                 }
             },
