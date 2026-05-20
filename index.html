@@ -350,7 +350,9 @@
                     if (currentScene === 'decision_point' && unrecognizedCount >= 3) {
                         transition('ending_neutral');
                     } else {
-                        messageBox.textContent = "I don't recognize that input.";
+                        messageBox.textContent = unrecognizedCount >= 5
+                            ? "I don't recognize that input. Type \"help\" for assistance."
+                            : "I don't recognize that input.";
                     }
                 }
             } else {
@@ -888,11 +890,18 @@
                     'Vance Basin is declared a federal Superfund site.',
                     'Cleanup will take 30 years.',
                     "The children who grew up there won't get those years back. But they will know why.",
-                    '[ Type "restart" to begin again. ]'
+                    '---',
+                    '>> ACHIEVEMENT UNLOCKED <<',
+                    '[name] did the right thing.',
+                    'The suppressed evidence reached the public. Eighteen families finally had answers.',
+                    'You looked at the data, understood what it meant, and chose to act on it.',
+                    'That is what science is for.',
+                    '---',
+                    '>> SCREENSHOT THIS SCREEN FOR ASSIGNMENT SUBMISSION <<\n\nOperator: [name]\nDecision: REPORTED THE EVIDENCE\nOutcome: Environmental justice achieved.\nAchievement: UNLOCKED\n\nType "restart" to play again.'
                 ],
                 handler: (input) => {
-                    if (/restart|again|replay|new|start/.test(input)) { window.location.reload(); return null; }
-                    setHint('[ Type "restart" to begin again. ]');
+                    if (/\b(restart|again|replay)\b/.test(input)) { window.location.reload(); return null; }
+                    setHint('>> SCREENSHOT THIS SCREEN FOR ASSIGNMENT SUBMISSION <<\n\nOperator: ' + playerName + '\nDecision: REPORTED THE EVIDENCE\nOutcome: Environmental justice achieved.\nAchievement: UNLOCKED\n\nType "restart" to play again.');
                     return null;
                 }
             },
@@ -932,7 +941,7 @@
                     '[ Type "restart" to make a different choice. ]'
                 ],
                 handler: (input) => {
-                    if (/restart|again|replay|new|start|different|choice/.test(input)) { window.location.reload(); return null; }
+                    if (/\b(restart|again|replay)\b/.test(input)) { window.location.reload(); return null; }
                     setHint('[ Type "restart" to make a different choice. ]');
                     return null;
                 }
@@ -946,7 +955,7 @@
                     '[ Type "restart" to begin again. ]'
                 ],
                 handler: (input) => {
-                    if (/restart|again|replay|new|start/.test(input)) { window.location.reload(); return null; }
+                    if (/\b(restart|again|replay)\b/.test(input)) { window.location.reload(); return null; }
                     setHint('[ Type "restart" to begin again. ]');
                     return null;
                 }
