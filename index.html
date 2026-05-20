@@ -101,6 +101,8 @@
         let twTimer = null;
         let twFull = '';
         let twDone = null;
+        let continueMode = false;
+        let pendingScene = null;
 
         function startTypewriter(text, onDone) {
             clearInterval(twTimer);
@@ -156,6 +158,22 @@
             handlerOverrodeMessage = true;
             skipTypewriter();
             messageBox.textContent = text;
+        }
+
+        function showContinuePrompt(sceneKey) {
+            pendingScene = sceneKey;
+            continueMode = true;
+            inputText.innerHTML = 'Continue? <span class="cursor"></span>';
+            hiddenInput.focus();
+        }
+
+        function showCorrectFeedback(label, body, nextSceneKey) {
+            handlerOverrodeMessage = true;
+            skipTypewriter();
+            messageBox.textContent = label;
+            setTimeout(() => {
+                startTypewriter(body, () => showContinuePrompt(nextSceneKey));
+            }, 600);
         }
 
         function detectIntent(input, keywords) {
@@ -300,6 +318,9 @@
         }
 
         function transition(sceneKey) {
+            continueMode = false;
+            pendingScene = null;
+
             // Hub auto-advance when both branches are done
             if (sceneKey === 'hub_1' && explored.has('victims_done') && explored.has('source_done'))
                 return transition('epa_link');
@@ -334,7 +355,29 @@
             if (!input) return;
 
             if (input === 'help') {
-                messageBox.textContent = getHelpMessage(currentScene);
+                messageBox.textContent = continueMode
+                    ? 'Type "yes" to continue to the next section, or wait and review.'
+                    : getHelpMessage(currentScene);
+                return;
+            }
+
+            if (continueMode) {
+                const a = analyzeAgreement(input);
+                if (a.mood === 'agrees') {
+                    const next = pendingScene;
+                    continueMode = false;
+                    pendingScene = null;
+                    transition(next);
+                } else if (a.mood === 'disagrees') {
+                    messageBox.textContent = 'Take your time. Type "yes" when you are ready to continue.';
+                    inputText.innerHTML = 'Continue? <span class="cursor"></span>';
+                } else {
+                    unrecognizedCount++;
+                    messageBox.textContent = unrecognizedCount >= 5
+                        ? 'I don\'t recognize that input. Type "help" for assistance.'
+                        : 'I don\'t recognize that input.';
+                    inputText.innerHTML = 'Continue? <span class="cursor"></span>';
+                }
                 return;
             }
 
@@ -747,14 +790,12 @@
                     qAttempts.q1 = (qAttempts.q1 || 0) + 1;
                     if (score >= 2) {
                         explored.add('victims_done');
-                        setHint('CORRECT. Children\'s rapidly dividing cells and developing organ systems are more sensitive to toxic damage. Smaller body mass means a higher dose per kilogram. Direct contact with soil and hand-to-mouth behavior increases ingestion. The same hazard hits harder at certain life stages. Continuing...');
-                        setTimeout(() => transition('hub_1'), 3200);
+                        showCorrectFeedback('CORRECT.', 'Children\'s rapidly dividing cells and developing organ systems are more sensitive to toxic damage. Smaller body mass means a higher dose per kilogram. Direct contact with soil and hand-to-mouth behavior increases ingestion. The same hazard hits harder at certain life stages.', 'hub_1');
                         return null;
                     }
                     if (qAttempts.q1 >= 2) {
                         explored.add('victims_done');
-                        setHint('Key concepts: (1) rapidly dividing cells = more chances for toxic damage to DNA; (2) developing organs - brain, immune system, kidneys - are far more sensitive to disruption; (3) children play on floors and ground, increasing direct contact with contaminated soil. Moving on...');
-                        setTimeout(() => transition('hub_1'), 3500);
+                        showCorrectFeedback('Key concepts:', '(1) rapidly dividing cells — more chances for toxic damage to DNA; (2) developing organs — brain, immune system, kidneys — are far more sensitive to disruption; (3) children play on floors and ground, increasing direct contact with contaminated soil.', 'hub_1');
                         return null;
                     }
                     if (score === 1) {
@@ -786,14 +827,12 @@
                     qAttempts.q2 = (qAttempts.q2 || 0) + 1;
                     if (score >= 2) {
                         explored.add('source_done');
-                        setHint('CORRECT. Precipitation carries dissolved contaminants downward through permeable soil and rock by infiltration. As water percolates through porous layers, it reaches the saturated zone - the aquifer - where it spreads through the groundwater system. The properties of the material (porosity, permeability) and of water (solubility, gravity-driven flow) determine how far and how fast. Continuing...');
-                        setTimeout(() => transition('hub_1'), 3500);
+                        showCorrectFeedback('CORRECT.', 'Precipitation carries dissolved contaminants downward through permeable soil and rock by infiltration. As water percolates through porous layers, it reaches the saturated zone — the aquifer — where it spreads through the groundwater system. The properties of the material (porosity, permeability) and of water (solubility, gravity-driven flow) determine how far and how fast.', 'hub_1');
                         return null;
                     }
                     if (qAttempts.q2 >= 2) {
                         explored.add('source_done');
-                        setHint('Key concepts: water infiltrates downward through permeable (porous) soil and rock; chemicals dissolve into that water and travel with it; the saturated zone below the water table is the aquifer - once contaminated there, the plume spreads with groundwater flow. Moving on...');
-                        setTimeout(() => transition('hub_1'), 3500);
+                        showCorrectFeedback('Key concepts:', 'Water infiltrates downward through permeable (porous) soil and rock; chemicals dissolve into that water and travel with it; the saturated zone below the water table is the aquifer — once contaminated there, the plume spreads with groundwater flow.', 'hub_1');
                         return null;
                     }
                     if (score === 1) {
@@ -825,14 +864,12 @@
                     qAttempts.q3 = (qAttempts.q3 || 0) + 1;
                     if (score >= 2) {
                         explored.add('holt_done');
-                        setHint('CORRECT. MCLs are set using dose-response research - scientists determine the concentration at which chronic exposure to a chemical creates unacceptable cancer or organ damage risk. The EPA then sets the legal limit below that threshold. Benzene at 400x the MCL means the community was exposed to risk levels orders of magnitude beyond what the standard was built to prevent. Continuing...');
-                        setTimeout(() => transition('hub_2'), 3500);
+                        showCorrectFeedback('CORRECT.', 'MCLs are set using dose-response research — scientists determine the concentration at which chronic exposure to a chemical creates unacceptable cancer or organ damage risk. The EPA then sets the legal limit below that threshold. Benzene at 400x the MCL means the community was exposed to risk levels orders of magnitude beyond what the standard was built to prevent.', 'hub_2');
                         return null;
                     }
                     if (qAttempts.q3 >= 2) {
                         explored.add('holt_done');
-                        setHint('Key concepts: MCLs are legal maximum concentrations (measured in ppm/ppb) based on dose-response studies - at what exposure level does a chemical cause cancer or organ damage? The EPA sets limits below that threshold. Benzene at 400x the MCL means the protective standard had completely failed to function. Moving on...');
-                        setTimeout(() => transition('hub_2'), 3500);
+                        showCorrectFeedback('Key concepts:', 'MCLs are legal maximum concentrations (measured in ppm/ppb) based on dose-response studies — at what exposure level does a chemical cause cancer or organ damage? The EPA sets limits below that threshold. Benzene at 400x the MCL means the protective standard had completely failed to function.', 'hub_2');
                         return null;
                     }
                     if (score === 1) {
@@ -863,13 +900,11 @@
                     const score = scoreGroups(text, groups);
                     qAttempts.q4 = (qAttempts.q4 || 0) + 1;
                     if (score >= 2) {
-                        setHint('CORRECT. Under CERCLA (Superfund), the EPA identifies the worst contaminated sites and leads federally-funded remediation. Methods include excavating contaminated soil, pump-and-treat systems for groundwater, and bioremediation using microbes. Cleanup takes decades because contaminants disperse through aquifer rock across wide areas, and the slow natural chemistry of breakdown cannot be significantly accelerated. Continuing...');
-                        setTimeout(() => transition('decision_point'), 3500);
+                        showCorrectFeedback('CORRECT.', 'Under CERCLA (Superfund), the EPA identifies the worst contaminated sites and leads federally-funded remediation. Methods include excavating contaminated soil, pump-and-treat systems for groundwater, and bioremediation using microbes. Cleanup takes decades because contaminants disperse through aquifer rock across wide areas, and the slow natural chemistry of breakdown cannot be significantly accelerated.', 'decision_point');
                         return null;
                     }
                     if (qAttempts.q4 >= 2) {
-                        setHint('Key concepts: Superfund/CERCLA = the federal law that designates the nation\'s most contaminated sites for EPA-led cleanup; methods include soil excavation, pump-and-treat groundwater systems, bioremediation; slow because chemicals spread through porous rock in aquifers over large areas and break down very slowly. Moving on...');
-                        setTimeout(() => transition('decision_point'), 3500);
+                        showCorrectFeedback('Key concepts:', 'Superfund/CERCLA = the federal law that designates the nation\'s most contaminated sites for EPA-led cleanup; methods include soil excavation, pump-and-treat groundwater systems, bioremediation; slow because chemicals spread through porous rock in aquifers over large areas and break down very slowly.', 'decision_point');
                         return null;
                     }
                     if (score === 1) {
