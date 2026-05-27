@@ -248,7 +248,9 @@
             const text = response.toLowerCase().trim();
             const agreementWords = ['yes', 'yeah', 'yep', 'yup', 'sure', 'okay', 'ok', 'fine', 'good', 'great',
                 'love', 'loved', 'like', 'liked', 'enjoyed', 'fun', 'cool', 'awesome', 'amazing', 'nice',
-                'absolutely', 'definitely', 'totally', 'understand', 'i do', 'i will', 'proceed'];
+                'absolutely', 'definitely', 'totally', 'understand', 'understood', 'i do', 'i will', 'proceed',
+                'confirmed', 'acknowledged', 'alright', 'all right', 'ready', 'go ahead', "let's go", 'lets go',
+                'continue', 'next', 'forward', 'sounds good', 'sounds', 'go on', 'agreed', 'affirmative'];
             const disagreementWords = ['no', 'nope', 'nah', 'never', 'hate', 'hated', 'annoying', 'bad',
                 'terrible', 'awful', 'stupid', 'boring', 'waste', 'pointless', "don't", "won't", "can't"];
             let agreementScore = 0, disagreementScore = 0;
@@ -287,7 +289,7 @@
                 q3_limits:      'Answer the question. Think: how MCLs are set using dose-response data, what ppm means, who sets these limits, and what 400x the threshold means for real risk.',
                 q4_superfund:   'Answer the question. Think: what Superfund/CERCLA is, cleanup methods, why remediation takes decades.',
                 start:          'Type your name to identify yourself.',
-                password:       'Enter the password to continue.',
+                password:       'Enter the correct password to continue.',
                 name_entry:     'Type "yes" to proceed or "no" to decline.',
                 denied:         'Type "yes" to proceed.',
                 warning:        'Type "yes" or "I understand".',
@@ -462,6 +464,7 @@
                 handler: (input) => {
                     const a = analyzeAgreement(input);
                     if (a.mood === 'agrees') return 'briefing_1';
+                    if (a.mood === 'disagrees') return 'denied';
                     return null;
                 }
             },
@@ -476,7 +479,9 @@
                     'What do you want to know?'
                 ],
                 handler: (input) => {
-                    if (detectIntent(input, ['why', 'what', 'how', 'children', 'sick', 'happened', 'source', 'cause', 'tell', 'know', 'more', 'who']))
+                    if (detectIntent(input, ['why', 'what', 'how', 'children', 'sick', 'happened', 'source', 'cause', 'tell', 'know', 'more', 'who',
+                                            'continue', 'next', 'go', 'proceed', 'show', 'learn', 'investigate', 'explore',
+                                            'find', 'look', 'read', 'start', 'begin', 'yes', 'everything', 'all']))
                         return 'hub_1';
                     return null;
                 }
@@ -494,8 +499,9 @@
                     return 'Good. One thread remains.\n\n→ VICTIMS - who was affected';
                 },
                 handler: (input) => {
-                    const victimKeys = ['victim', 'sick', 'children', 'families', 'who got', 'affected', 'ill', 'disease', 'cancer', 'people'];
-                    const sourceKeys = ['source', 'contamination', 'contaminated', 'cause', 'chemical', 'toxic', 'where', 'basin', 'benzene', 'poison'];
+                    const victimKeys = ['victim', 'sick', 'children', 'families', 'who got', 'affected', 'ill', 'disease', 'cancer', 'people', 'kid', 'patient', 'marsh', 'health'];
+                    const sourceKeys = ['source', 'contamination', 'contaminated', 'cause', 'chemical', 'toxic', 'where', 'basin', 'benzene', 'poison', 'water', 'ground', 'site', 'vance', 'waste'];
+                    const navKeys = ['continue', 'next', 'go', 'proceed', 'explore', 'investigate', 'more', 'both', 'start', 'begin'];
 
                     if (detectIntent(input, victimKeys)) {
                         if (!explored.has('victims_done')) return 'victims_a';
@@ -505,6 +511,10 @@
                     if (detectIntent(input, sourceKeys)) {
                         if (!explored.has('source_done')) return 'source_b';
                         setHint("You've already examined the contamination source.\n\n→ Ask about the VICTIMS.");
+                        return null;
+                    }
+                    if (detectIntent(input, navKeys)) {
+                        setHint(getHelpMessage('hub_1'));
                         return null;
                     }
                     return null;
@@ -581,8 +591,9 @@
                     return 'One lead remains.\n\n→ HOLT - the man who tried to stop this';
                 },
                 handler: (input) => {
-                    const holtKeys = ['holt', 'raymond', 'chemist', 'employee', 'worker', 'man who'];
-                    const landKeys = ['land', 'sale', 'sold', 'school', 'deed', 'district', 'playground', 'dollar', 'purchase'];
+                    const holtKeys = ['holt', 'raymond', 'chemist', 'employee', 'worker', 'man who', 'tate', 'whistleblow', 'report', 'intern'];
+                    const landKeys = ['land', 'sale', 'sold', 'school', 'deed', 'district', 'playground', 'dollar', 'purchase', 'property', 'site', 'transfer', 'bought'];
+                    const navKeys = ['continue', 'next', 'go', 'proceed', 'explore', 'investigate', 'more', 'both', 'start', 'follow'];
 
                     if (detectIntent(input, holtKeys)) {
                         if (!explored.has('holt_done')) return 'holt_a';
@@ -592,6 +603,10 @@
                     if (detectIntent(input, landKeys)) {
                         if (!explored.has('land_done')) return 'land_b';
                         setHint("You've already examined the land sale.\n\n→ Ask about HOLT.");
+                        return null;
+                    }
+                    if (detectIntent(input, navKeys)) {
+                        setHint(getHelpMessage('hub_2'));
                         return null;
                     }
                     return null;
@@ -665,8 +680,9 @@
                     return 'One path remains.\n\n→ CRANE - the man at the center of it all';
                 },
                 handler: (input) => {
-                    const craneKeys = ['crane', 'director', 'h crane', 'h.', 'signed'];
-                    const boardKeys = ['board', 'seven', 'vote', 'executives', 'members', 'who else', 'others'];
+                    const craneKeys = ['crane', 'director', 'h crane', 'h.', 'signed', 'h ', 'cover', 'donation', 'retired', 'center'];
+                    const boardKeys = ['board', 'seven', 'vote', 'executives', 'members', 'who else', 'others', 'silent', 'voted', 'unanimous', 'backed'];
+                    const navKeys = ['continue', 'next', 'go', 'proceed', 'explore', 'investigate', 'more', 'both', 'follow', 'look'];
 
                     if (detectIntent(input, craneKeys)) {
                         if (!explored.has('crane_done')) return 'crane_a';
@@ -676,6 +692,10 @@
                     if (detectIntent(input, boardKeys)) {
                         if (!explored.has('board_done')) return 'board_b';
                         setHint("You've already examined the board.\n\n→ Ask about CRANE.");
+                        return null;
+                    }
+                    if (detectIntent(input, navKeys)) {
+                        setHint(getHelpMessage('hub_3'));
                         return null;
                     }
                     return null;
